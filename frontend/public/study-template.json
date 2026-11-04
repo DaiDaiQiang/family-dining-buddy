@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "type": "family-dining.study",
+  "exported_at": "2026-10-19 10:00:00",
+  "remark": "学习板块导入模板：一个文件同时承载题库、单词、知识点。删掉示例条目、换成自己的内容即可导入。",
+
+  "data": {
+    "subjects": [
+      { "value": "math", "name": "数学", "emoji": "🔢" },
+      { "value": "chinese", "name": "语文", "emoji": "📖" },
+      { "value": "english", "name": "英语", "emoji": "🔤" },
+      { "value": "physics", "name": "物理", "emoji": "⚛️" }
+    ],
+
+    "questions": [
+      {
+        "id": "q-001",
+        "subject": "math",
+        "type": "single",
+        "difficulty": "easy",
+        "stem": "一元二次方程 x² - 5x + 6 = 0 的两个根是？",
+        "options": [
+          { "key": "A", "text": "1 和 6" },
+          { "key": "B", "text": "2 和 3" },
+          { "key": "C", "text": "-2 和 -3" },
+          { "key": "D", "text": "1 和 5" }
+        ],
+        "answer": ["B"],
+        "analysis": "因式分解得 (x-2)(x-3)=0，所以 x=2 或 x=3。也可用求根公式验证。",
+        "tags": ["一元二次方程", "必考"],
+        "source": "课本例题 3-2",
+        "score": 3
+      },
+      {
+        "id": "q-002",
+        "subject": "math",
+        "type": "multiple",
+        "difficulty": "medium",
+        "stem": "下列函数中，在 x=0 处连续的有（多选）",
+        "options": [
+          { "key": "A", "text": "y = sin x" },
+          { "key": "B", "text": "y = 1/x" },
+          { "key": "C", "text": "y = e^x" },
+          { "key": "D", "text": "y = |x|" }
+        ],
+        "answer": ["A", "C", "D"],
+        "analysis": "y = 1/x 在 x=0 处无定义，因此不连续；其余三个函数在 x=0 处都有定义且极限等于函数值。",
+        "tags": ["函数连续性"],
+        "source": "",
+        "score": 4
+      },
+      {
+        "id": "q-003",
+        "subject": "physics",
+        "type": "judge",
+        "difficulty": "easy",
+        "stem": "物体做匀速直线运动时，所受合力一定为零。",
+        "options": [
+          { "key": "T", "text": "正确" },
+          { "key": "F", "text": "错误" }
+        ],
+        "answer": ["T"],
+        "analysis": "由牛顿第一定律，匀速直线运动是平衡状态，合力为零。",
+        "tags": ["牛顿定律"],
+        "source": "",
+        "score": 2
+      },
+      {
+        "id": "q-004",
+        "subject": "chinese",
+        "type": "fill",
+        "difficulty": "easy",
+        "stem": "补全诗句：会当凌绝顶，__________。",
+        "options": [],
+        "answer": ["一览众山小"],
+        "analysis": "出自杜甫《望岳》。若允许多种写法，可用竖线分隔，如 \"一览众山小|一覽眾山小\"。",
+        "tags": ["古诗默写", "杜甫"],
+        "source": "《望岳》",
+        "score": 2
+      },
+      {
+        "id": "q-005",
+        "subject": "chinese",
+        "type": "answer",
+        "difficulty": "hard",
+        "stem": "简要分析《背影》中父亲爬月台买橘子一段的细节描写及其作用。",
+        "options": [],
+        "answer": ["参考答案：通过「探」「攀」「缩」「倾」等动词刻画父亲行动的艰难，以外貌与动作细节表现父爱的深沉，也为「我」的情感转变作铺垫。"],
+        "analysis": "问答题不自动判分，作答后翻开参考答案自评。",
+        "tags": ["现代文阅读"],
+        "source": "",
+        "score": 6
+      }
+    ],
+
+    "english": [
+      {
+        "id": "w-001",
+        "word": "abandon",
+        "phonetic": "/əˈbæn.dən/",
+        "meaning": "v. 放弃；抛弃",
+        "example": "He had to abandon the plan.",
+        "example_cn": "他不得不放弃这个计划。",
+        "level": "初中",
+        "unit": "Unit 3",
+        "tags": ["高频词"]
+      },
+      {
+        "id": "w-002",
+        "word": "benefit",
+        "phonetic": "/ˈben.ɪ.fɪt/",
+        "meaning": "n. 好处；v. 受益",
+        "example": "Exercise benefits your health.",
+        "example_cn": "锻炼有益于你的健康。",
+        "level": "初中",
+        "unit": "Unit 3",
+        "tags": ["高频词"]
+      },
+      {
+        "id": "w-003",
+        "word": "deliberate",
+        "phonetic": "/dɪˈlɪb.ər.ət/",
+        "meaning": "adj. 故意的；v. 仔细考虑",
+        "example": "It was a deliberate choice.",
+        "example_cn": "这是一个经过深思熟虑的选择。",
+        "level": "高中",
+        "unit": "Unit 1",
+        "tags": ["写作常用"]
+      }
+    ],
+
+    "notes": [
+      {
+        "id": "n-001",
+        "subject": "math",
+        "title": "一元二次方程求根公式",
+        "content": "对于 ax² + bx + c = 0（a ≠ 0），根的公式为：\nx = [-b ± √(b² - 4ac)] / 2a\n\n判别式 Δ = b² - 4ac 决定根的情况：\nΔ > 0 有两个不相等的实根；\nΔ = 0 有两个相等的实根；\nΔ < 0 无实根（有一对共轭复根）。",
+        "key_points": [
+          "判别式 Δ = b² - 4ac",
+          "两根之和 = -b/a，两根之积 = c/a（韦达定理）",
+          "a ≠ 0 是前提，否则不是二次方程"
+        ],
+        "tags": ["代数", "必考"],
+        "is_exam_point": true
+      },
+      {
+        "id": "n-002",
+        "subject": "physics",
+        "title": "牛顿三定律",
+        "content": "第一定律（惯性定律）：物体在不受外力作用时，保持静止或匀速直线运动状态。\n第二定律：F = ma，加速度与合力同向，与质量成反比。\n第三定律：作用力与反作用力大小相等、方向相反、作用在不同物体上。",
+        "key_points": [
+          "F = ma 中 F 指合力",
+          "第三定律的两个力不能相互抵消（作用对象不同）"
+        ],
+        "tags": ["力学"],
+        "is_exam_point": true
+      },
+      {
+        "id": "n-003",
+        "subject": "chinese",
+        "title": "常见修辞手法辨析",
+        "content": "比喻要有本体、喻体和相似点；拟人是把事物当人来写；夸张是对特征作扩大或缩小；排比是三个以上结构相似的句子并列。",
+        "key_points": ["比喻 ≠ 拟人", "排比至少三项"],
+        "tags": ["修辞"],
+        "is_exam_point": false
+      }
+    ],
+
+    "progress": {
+      "questions": {},
+      "words": {},
+      "notes": {}
+    }
+  }
+}

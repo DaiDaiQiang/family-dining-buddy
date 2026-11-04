@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#C2703D" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="description" content="家庭点餐系统 —— 记菜谱、点菜、自动生成菜单与采购清单" />
+  <title>孙府 · 家庭点餐</title>
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <style>
+    /* ---- 首屏加载动画（妍 · 与 src/components/YanLoader.vue 同款） ---- */
+    .yan-boot{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(120% 95% at 50% -10%,#FFFDF6 0%,#FBF0DC 45%,#F5E3C4 100%);
+      font-family:"PingFang SC","Microsoft YaHei",-apple-system,system-ui,sans-serif;overflow:hidden;}
+    .yan-boot-blob{position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;z-index:0;}
+    .yan-boot-blob--blue{width:340px;height:340px;background:#F2C89B;opacity:.5;top:-120px;left:-100px;animation:yan-boot-drift1 11s ease-in-out infinite;}
+    .yan-boot-blob--pink{width:320px;height:320px;background:#E2B686;opacity:.45;bottom:-130px;right:-110px;animation:yan-boot-drift2 13s ease-in-out infinite;}
+    @keyframes yan-boot-drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,30px) scale(1.1)}}
+    @keyframes yan-boot-drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-36px,-26px) scale(1.08)}}
+    .yan-boot-loader{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:12px;}
+    .yan-boot-loader::before{content:"";position:absolute;top:44%;left:50%;width:78%;aspect-ratio:1/1;transform:translate(-50%,-50%);
+      border-radius:50%;z-index:-1;filter:blur(12px);
+      background:radial-gradient(circle,rgba(255,255,255,.92) 0%,rgba(255,255,255,.55) 45%,rgba(255,255,255,0) 72%);}
+    .yan-boot-logo{width:min(64vw,310px);height:auto;overflow:visible;animation:yan-boot-life 2.8s ease-in-out infinite;}
+    @keyframes yan-boot-life{0%{opacity:0;transform:translateY(9px) scale(.94)}7%{opacity:1;transform:translateY(0) scale(1)}88%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-9px) scale(1.03)}}
+    .yan-boot-stroke{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:100;stroke-dashoffset:100;animation-timing-function:cubic-bezier(.55,.05,.25,1);}
+    .yan-boot-stroke--head{stroke:url(#yanboot-gBlue);stroke-width:6.8;filter:drop-shadow(0 3px 7px rgba(194,112,61,.30));animation:yan-boot-drawHead 2.8s cubic-bezier(.55,.05,.25,1) infinite;}
+    .yan-boot-stroke--arc{stroke:url(#yanboot-gBlue);stroke-width:8;opacity:.92;filter:drop-shadow(0 5px 10px rgba(194,112,61,.26));animation:yan-boot-drawArc 2.8s cubic-bezier(.55,.05,.25,1) infinite;}
+    .yan-boot-stroke--ribbon{stroke:url(#yanboot-gPink);stroke-width:9.5;opacity:.94;filter:drop-shadow(0 4px 9px rgba(184,92,56,.34));animation:yan-boot-drawRibbon 2.8s cubic-bezier(.55,.05,.25,1) infinite;}
+    @keyframes yan-boot-drawHead{0%{stroke-dashoffset:100}50%,100%{stroke-dashoffset:0}}
+    @keyframes yan-boot-drawArc{0%,7%{stroke-dashoffset:100}58%,100%{stroke-dashoffset:0}}
+    @keyframes yan-boot-drawRibbon{0%,46%{stroke-dashoffset:100}84%,100%{stroke-dashoffset:0}}
+    .yan-boot-brand,.yan-boot-brand-halo{font-family:"STXingkai","华文行楷","STKaiti","华文楷体","KaiTi","楷体","Kaiti SC","SimSun",serif;font-size:118px;text-anchor:middle;}
+    .yan-boot-brand-halo{fill:none;stroke:#fff;stroke-width:6.5;opacity:.72;}
+    .yan-boot-brand{fill:url(#yanboot-gMix);stroke:url(#yanboot-gMix);stroke-width:2.6;paint-order:stroke;filter:drop-shadow(0 4px 10px rgba(138,69,34,.22));}
+    #yanboot-wipeRect{animation:yan-boot-wipe 2.8s cubic-bezier(.7,0,.3,1) infinite;}
+    @keyframes yan-boot-wipe{0%,18%{transform:translateX(-280px)}66%,100%{transform:translateX(340px)}}
+    .yan-boot-heart{fill:url(#yanboot-gPink);transform-box:fill-box;transform-origin:center;transform:scale(0);filter:drop-shadow(0 3px 6px rgba(184,92,56,.30));}
+    .yan-boot-heart--1{animation:yan-boot-pop1 2.8s ease-in-out infinite;}
+    .yan-boot-heart--2{animation:yan-boot-pop2 2.8s ease-in-out infinite;}
+    @keyframes yan-boot-pop1{0%,52%{transform:scale(0);opacity:0}58%{transform:scale(1.38);opacity:1}63%{transform:scale(.9)}68%{transform:scale(1.14)}73%{transform:scale(1)}78%{transform:scale(1.2)}83%,100%{transform:scale(1);opacity:1}}
+    @keyframes yan-boot-pop2{0%,62%{transform:scale(0);opacity:0}68%{transform:scale(1.38);opacity:1}73%{transform:scale(.9)}78%{transform:scale(1.14)}83%{transform:scale(1)}88%{transform:scale(1.2)}93%,100%{transform:scale(1);opacity:1}}
+    .yan-boot-tip{display:flex;align-items:center;gap:7px;font-size:13.5px;letter-spacing:.2em;color:#A85A2E;animation:yan-boot-tipPulse 2.8s ease-in-out infinite;}
+    .yan-boot-tip i{width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,#D1915A,#B85C38);animation:yan-boot-dot 1.2s ease-in-out infinite;}
+    .yan-boot-tip i:nth-child(2){animation-delay:.15s}
+    .yan-boot-tip i:nth-child(3){animation-delay:.3s}
+    @keyframes yan-boot-dot{0%,100%{transform:translateY(0);opacity:.35}50%{transform:translateY(-5px);opacity:1}}
+    @keyframes yan-boot-tipPulse{0%{opacity:0}12%{opacity:1}85%{opacity:1}100%{opacity:0}}
+    @media (prefers-reduced-motion: reduce){.yan-boot *{animation-duration:.001s !important;animation-iteration-count:1 !important}}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="yan-boot" role="status" aria-label="加载中">
+      <div class="yan-boot-blob yan-boot-blob--blue"></div>
+      <div class="yan-boot-blob yan-boot-blob--pink"></div>
+      <div class="yan-boot-loader">
+        <svg class="yan-boot-logo" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="yanboot-gBlue" x1="0.05" y1="0" x2="0.95" y2="1">
+              <stop offset="0%" stop-color="#F2C89B"/><stop offset="55%" stop-color="#D1915A"/><stop offset="100%" stop-color="#B85C38"/>
+            </linearGradient>
+            <linearGradient id="yanboot-gPink" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#F7E8D2"/><stop offset="100%" stop-color="#D1915A"/>
+            </linearGradient>
+            <linearGradient id="yanboot-gMix" x1="0.05" y1="0.1" x2="0.95" y2="0.95">
+              <stop offset="0%" stop-color="#F7E8D2"/><stop offset="42%" stop-color="#EFD4B2"/><stop offset="62%" stop-color="#D1915A"/><stop offset="100%" stop-color="#B85C38"/>
+            </linearGradient>
+            <linearGradient id="yanboot-wipeGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#fff"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </linearGradient>
+            <mask id="yanboot-wipe" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="240">
+              <rect id="yanboot-wipeRect" x="-280" y="0" width="280" height="240" fill="url(#yanboot-wipeGrad)"/>
+            </mask>
+          </defs>
+          <path class="yan-boot-stroke yan-boot-stroke--arc" pathLength="100" d="M20 140 C22 190 70 224 124 224 C164 224 200 206 216 176"/>
+          <path class="yan-boot-stroke yan-boot-stroke--head" pathLength="100" d="M62 196 C36 184 22 154 24 124 C26 106 34 92 46 82 L40 26 L90 64 C106 56 130 56 146 64 L198 24 L190 84 C202 96 212 116 212 138 C210 168 190 190 162 198 C128 208 90 204 62 196 Z"/>
+          <g mask="url(#yanboot-wipe)">
+            <text class="yan-boot-brand-halo" x="120" y="164">妍</text>
+            <text class="yan-boot-brand" x="120" y="164">妍</text>
+          </g>
+          <path class="yan-boot-stroke yan-boot-stroke--ribbon" pathLength="100" d="M186 90 C170 126 144 150 112 162 C86 172 58 168 36 152"/>
+          <g transform="translate(10,54)">
+            <path class="yan-boot-heart yan-boot-heart--1" d="M12 21 C5 16.5 0 12.2 0 7.2 C0 3.2 3 .6 6.2 .6 C8.6 .6 10.8 1.9 12 3.9 C13.2 1.9 15.4 .6 17.8 .6 C21 .6 24 3.2 24 7.2 C24 12.2 19 16.5 12 21 Z"/>
+          </g>
+          <g transform="translate(176,166) scale(.85)">
+            <path class="yan-boot-heart yan-boot-heart--2" d="M12 21 C5 16.5 0 12.2 0 7.2 C0 3.2 3 .6 6.2 .6 C8.6 .6 10.8 1.9 12 3.9 C13.2 1.9 15.4 .6 17.8 .6 C21 .6 24 3.2 24 7.2 C24 12.2 19 16.5 12 21 Z"/>
+          </g>
+        </svg>
+        <div class="yan-boot-tip">孙府正在准备<i></i><i></i><i></i></div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

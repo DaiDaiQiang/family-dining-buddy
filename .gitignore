@@ -1,0 +1,49 @@
+# ===== 敏感信息（绝对不能进仓库）=====
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# 数据库备份（含真实点餐/家庭成员数据）
+database/backup/
+
+# 上传的文件（头像/照片等用户数据）
+backend/uploads/
+deploy/**/uploads/
+uploads/
+
+# ===== 构建产物 / 依赖 =====
+backend/target/
+backend/target-p1/
+backend/target-*/
+node_modules/
+frontend/node_modules/
+database/tools/node_modules/
+dist/
+frontend/dist/
+deploy/**/dist/
+
+# ===== 二进制 / 编译产物 =====
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+deploy/**/bin/
+
+# ===== Rust =====
+*.rs.bk
+Cargo.lock.orig
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ===== WorkBuddy 工作区数据 =====
+.workbuddy/
+
+# ===== 日志 =====
+*.log

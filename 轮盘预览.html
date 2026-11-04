@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>刷题页 · 试卷轮盘预览</title>
+<style>
+:root{
+  --brand-500:#4A90D9;
+  --brand-600:#3576c2;
+  --brand-700:#2a5fa0;
+  --brand-50:#eef4fb;
+  --brand-100:#d9e6f5;
+  --surface:#ffffff;
+  --surface-2:#f7f9fc;
+  --border:#e5e9f0;
+  --border-strong:#d3dae4;
+  --bg-subtle:#f0f2f6;
+  --text-1:#1a1d23;
+  --text-2:#5b6472;
+  --text-3:#8a93a3;
+  --sh-sm:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sh-lg:0 18px 48px rgba(0,0,0,.16),0 8px 24px rgba(0,0,0,.1);
+  --sh-xl:0 24px 70px rgba(0,0,0,.2),0 10px 30px rgba(0,0,0,.14);
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#eef1f6;
+  color:var(--text-1);
+  font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;align-items:center;
+  padding:24px 16px 40px;
+}
+.note{
+  text-align:center;font-size:13px;color:var(--text-3);margin-bottom:4px;
+}
+.note b{color:var(--brand-600)}
+h1{font-size:22px;font-weight:800;margin:6px 0 2px;letter-spacing:-.02em}
+.sub{font-size:13px;color:var(--text-3);margin:0 0 20px}
+
+.wrap{
+  width:100%;max-width:560px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:20px;
+  box-shadow:var(--sh-sm);
+  padding:18px 16px 20px;
+}
+.stage-wrap{position:relative}
+.stage{
+  position:relative;height:300px;overflow:hidden;
+  perspective:1400px;perspective-origin:50% 150px;
+  touch-action:pan-y;user-select:none;-webkit-user-select:none;
+}
+.scene{position:absolute;left:0;right:0;top:0;height:300px;transform-style:preserve-3d}
+.glow{
+  position:absolute;left:50%;top:-30px;width:560px;height:320px;transform:translateX(-50%);
+  pointer-events:none;
+  background:radial-gradient(closest-side,rgba(74,144,217,.16) 0%,rgba(74,144,217,.08) 46%,transparent 74%);
+}
+.track{
+  position:absolute;left:50%;top:175px;width:640px;height:100px;transform:translateX(-50%);
+  border-radius:50%;pointer-events:none;border:1px solid var(--border);
+  box-shadow:inset 0 0 40px rgba(74,144,217,.06);
+}
+.wheel{position:absolute;left:50%;top:0;width:0;height:0;transform-style:preserve-3d}
+.book{
+  position:absolute;left:0;top:36px;width:150px;height:210px;margin-left:-75px;
+  padding:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;
+  background:var(--surface-2);cursor:pointer;transform-style:preserve-3d;
+  box-shadow:var(--sh-lg);
+  transition:transform .8s var(--ease),opacity .6s ease,filter .6s ease,box-shadow .5s ease;
+  will-change:transform,opacity;-webkit-appearance:none;appearance:none;font:inherit;color:inherit;
+}
+.book img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.book .fb{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:48px;pointer-events:none;
+}
+.book .scrim{
+  position:absolute;left:0;right:0;bottom:0;height:78px;
+  background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.55) 55%,rgba(0,0,0,.86) 100%);
+}
+.book .bt{
+  position:absolute;left:10px;right:10px;bottom:28px;font-size:14px;font-weight:700;color:#fff;
+  text-shadow:0 2px 12px rgba(0,0,0,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;
+}
+.book .bc{
+  position:absolute;left:10px;right:10px;bottom:11px;font-size:11px;color:rgba(255,255,255,.72);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;
+}
+.book.is-active{box-shadow:var(--sh-xl)}
+.book:not(.is-active):hover{filter:brightness(1.1) saturate(1.04)}
+
+.arrow{
+  position:absolute;top:50%;width:44px;height:44px;transform:translateY(-50%);
+  display:grid;place-items:center;cursor:pointer;z-index:20;border-radius:50%;
+  border:1px solid var(--border-strong);background:rgba(255,255,255,.72);
+  backdrop-filter:blur(8px);color:var(--text-2);
+  transition:border-color .25s,background .25s,transform .25s,color .25s;padding:0;
+}
+.arrow svg{width:20px;height:20px;display:block}
+.arrow:hover{border-color:var(--brand-500);color:var(--brand-600);background:var(--brand-50)}
+.arrow:active{transform:translateY(-50%) scale(.94)}
+.arrow.prev{left:4px}
+.arrow.next{right:4px}
+
+.dots{display:flex;align-items:center;justify-content:center;gap:7px;padding:8px 0 4px}
+.dot{width:7px;height:7px;padding:0;border:0;border-radius:99px;cursor:pointer;background:var(--border-strong);transition:width .38s var(--ease),background .38s}
+.dot:hover{background:var(--text-3)}
+.dot.on{width:22px;background:var(--brand-500)}
+
+.info{display:flex;justify-content:center;margin-top:10px}
+.card{width:100%;padding:16px 18px;border-radius:14px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--sh-sm)}
+.meta{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.chip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:100px;font-size:11.5px;font-weight:600;color:var(--brand-700);background:var(--brand-50);border:1px solid var(--brand-100)}
+.chip.ghost{color:var(--text-2);background:var(--bg-subtle);border-color:var(--border)}
+.title{margin:0 0 8px;font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.35}
+.desc{margin:0 0 14px;font-size:13px;line-height:1.7;color:var(--text-2)}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;padding:11px 26px;border-radius:11px;
+  font-size:14px;font-weight:600;cursor:pointer;border:1px solid transparent;
+  background:linear-gradient(135deg,#5a9ae0,#3a7bd0);color:#fff;
+  transition:transform .2s,filter .25s;box-shadow:0 4px 12px rgba(74,144,217,.3);
+}
+.btn:active{transform:scale(.98)}
+.btn:hover{filter:brightness(1.06)}
+</style>
+</head>
+<body>
+<p class="note">这是刷题页「试卷轮盘」的<b>独立预览</b>（与真实页面同一套 3D 交互逻辑）</p>
+<h1>✏️ 刷题 · 试卷轮盘</h1>
+<p class="sub">共 10 道题 · 3 个题库 · 按名称排序</p>
+
+<div class="wrap">
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <div class="scene">
+        <div class="glow"></div>
+        <div class="track"></div>
+        <div class="wheel" id="wheel"></div>
+      </div>
+      <button class="arrow prev" id="prev" type="button" aria-label="上一份">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="arrow next" id="next" type="button" aria-label="下一份">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="dots" id="dots"></div>
+
+  <div class="info">
+    <div class="card">
+      <div class="meta">
+        <span class="chip" id="chip">📚 5 道题</span>
+        <span class="chip ghost" id="pos">试卷 1 / 3</span>
+      </div>
+      <h2 class="title" id="title"></h2>
+      <p class="desc" id="desc"></p>
+      <button class="btn" id="enter" type="button">开始刷题</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var BANKS = [
+    { name:'测试卷·全题型演示', cover:'/api/uploads/20261103110832-0000-18c4a8fc.jpg', desc:'用于验证导入字段（名称/图片/说明）与刷题轮盘的示例试卷，覆盖五种题型。', count:5 },
+    { name:'数学·基础训练', cover:'', desc:'小学数学基础运算与几何专项练习。', count:3 },
+    { name:'语文·古诗默写', cover:'', desc:'小学语文必背古诗与理解默写。', count:2 }
+  ];
+  // 按名称排序（模拟 localeCompare zh-Hans-CN）
+  BANKS.sort(function(a,b){ return a.name.localeCompare(b.name,'zh-Hans-CN'); });
+
+  var HUE = [
+    'linear-gradient(135deg,#1F2A44,#3a4a70)',
+    'linear-gradient(135deg,#3b2f5f,#6a4a8f)',
+    'linear-gradient(135deg,#2f4f4f,#4a7a6f)',
+    'linear-gradient(135deg,#5f3a2f,#8f5a3a)',
+    'linear-gradient(135deg,#2f3f5f,#3a5f8f)',
+    'linear-gradient(135deg,#4a3a5f,#7a5a8f)'
+  ];
+  function hue(i){ var h=0,n=BANKS[i].name; for(var c=0;c<n.length;c++) h=(h*31+n.charCodeAt(c))>>>0; return HUE[h%HUE.length]; }
+
+  var N = BANKS.length, index = 0;
+  var wheel = document.getElementById('wheel');
+  var dotsEl = document.getElementById('dots');
+  var chipEl = document.getElementById('chip');
+  var posEl = document.getElementById('pos');
+  var titleEl = document.getElementById('title');
+  var descEl = document.getElementById('desc');
+
+  var nodes=[], dotNodes=[];
+  BANKS.forEach(function(b,i){
+    var el=document.createElement('button');
+    el.type='button'; el.className='book';
+    if(b.cover){
+      var img=new Image(); img.src=b.cover; img.alt=b.name; img.draggable=false; el.appendChild(img);
+    }else{
+      var fb=document.createElement('span'); fb.className='fb'; fb.textContent='📄'; fb.style.background=hue(i); el.appendChild(fb);
+    }
+    var sc=document.createElement('span'); sc.className='scrim'; el.appendChild(sc);
+    var bt=document.createElement('span'); bt.className='bt'; bt.textContent=b.name; el.appendChild(bt);
+    var bc=document.createElement('span'); bc.className='bc'; bc.textContent=b.count+' 题'; el.appendChild(bc);
+    el.addEventListener('click',function(){ if(i===index){enter();}else{setIndex(i);} });
+    wheel.appendChild(el); nodes.push(el);
+
+    var d=document.createElement('button'); d.type='button'; d.className='dot';
+    d.addEventListener('click',function(){ setIndex(i); });
+    dotsEl.appendChild(d); dotNodes.push(d);
+  });
+
+  function layout(){
+    nodes.forEach(function(el,i){
+      var d=i-index;
+      if(d>N/2)d-=N; if(d<-N/2)d+=N;
+      var ad=Math.abs(d), dir=d===0?0:(d>0?1:-1);
+      var x,z,ry,sc,op;
+      if(ad===0){x=0;z=150;ry=0;sc=1;op=1;}
+      else if(ad===1){x=210*dir;z=-10;ry=-26*dir;sc=0.88;op=0.85;}
+      else{x=396*dir;z=-180;ry=-38*dir;sc=0.72;op=0.48;}
+      el.style.transform='translate3d('+x+'px,0,'+z+'px) rotateY('+ry+'deg) scale('+sc+')';
+      el.style.opacity=op; el.style.zIndex=String(30-ad*8);
+      el.style.filter=ad===0?'none':'brightness('+(1-ad*0.06).toFixed(2)+') saturate('+(1-ad*0.08).toFixed(2)+')';
+      el.classList.toggle('is-active',ad===0);
+    });
+    dotNodes.forEach(function(d,i){ d.classList.toggle('on',i===index); });
+  }
+
+  function renderInfo(){
+    var b=BANKS[index];
+    chipEl.textContent='📚 '+b.count+' 道题';
+    posEl.textContent='试卷 '+(index+1)+' / '+N;
+    titleEl.textContent=b.name;
+    descEl.textContent=b.desc || '这份试卷还没有说明，点击「开始刷题」直接进入。';
+  }
+
+  function setIndex(i){ index=((i%N)+N)%N; layout(); renderInfo(); }
+  function enter(){ /* 真实页面里这里是 startPractice('order') */ }
+
+  document.getElementById('prev').addEventListener('click',function(){setIndex(index-1);});
+  document.getElementById('next').addEventListener('click',function(){setIndex(index+1);});
+  document.getElementById('enter').addEventListener('click',function(){ alert('真实页面这里会进入「'+BANKS[index].name+'」刷题'); });
+
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')setIndex(index-1);
+    else if(e.key==='ArrowRight')setIndex(index+1);
+  });
+
+  layout(); renderInfo();
+})();
+</script>
+</body>
+</html>

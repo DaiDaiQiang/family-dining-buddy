@@ -1,0 +1,21 @@
+{
+  "name": "family-dining-db-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "数据库运维工具：导入建表脚本、导出标准 SQL 备份",
+  "scripts": {
+    "preflight": "node preflight.mjs",
+    "apply": "node apply-schema.mjs",
+    "migrate": "node migrate.mjs",
+    "check": "node check-data.mjs",
+    "dump": "node dump-database.mjs",
+    "verify-dump": "node verify-dump.mjs",
+    "e2e": "node e2e-write-test.mjs",
+    "fix-stats": "node fix-stats.mjs",
+    "test-parser": "node test-parser.mjs"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.5"
+  }
+}

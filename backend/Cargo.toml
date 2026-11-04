@@ -1,0 +1,59 @@
+[package]
+name = "family-dining-api"
+version = "1.0.0"
+edition = "2021"
+authors = ["Family Dining System"]
+description = "家庭点餐系统后端 API —— actix-web + sqlx(MySQL 8.0)"
+rust-version = "1.75"
+
+[[bin]]
+name = "family-dining-api"
+path = "src/main.rs"
+
+[dependencies]
+# Web 框架
+actix-web = "4"
+actix-cors = "0.7"
+actix-files = "0.6"
+
+# 异步运行时
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "time"] }
+
+# 数据库（MySQL 8.0）
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "mysql",
+    "macros",
+    "chrono",
+    "rust_decimal",
+    "json",
+] }
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rust_decimal = { version = "1", features = ["serde-with-float"] }
+
+# 鉴权（每人密码 + JWT）
+argon2 = "0.5"
+jsonwebtoken = "9"
+
+# 时间
+chrono = { version = "0.4", features = ["serde"] }
+
+# 配置与日志
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# 错误处理
+thiserror = "2"
+anyhow = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
