@@ -51,6 +51,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2"
 anyhow = "1"
 
+# HTTP 抓取（导入下厨房菜谱）
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+scraper = "0.21"
+
 [profile.release]
 opt-level = 3
 lto = "thin"

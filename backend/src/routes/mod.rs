@@ -2,7 +2,9 @@
 
 pub mod auth;
 pub mod basics;
+pub mod consumable;
 pub mod health;
+pub mod importer;
 pub mod ledger;
 pub mod orders;
 pub mod parcel;
@@ -71,6 +73,21 @@ pub fn configure(cfg: &mut web::ServiceConfig, upload_dir: PathBuf) {
             // ---- 系统版本更新记录（个人中心 · 版本详情）----
             .route("/versions", web::get().to(version::list_versions))
             .route("/versions", web::post().to(version::create_version))
+            // ---- 耗材维护与消耗统计（阶段 3，静态段放在 {id} 之前）----
+            .route("/consumables/stats", web::get().to(consumable::stats))
+            .route("/consumables/low", web::get().to(consumable::list_low_stock))
+            .route("/consumables", web::get().to(consumable::list_consumables))
+            .route("/consumables", web::post().to(consumable::create_consumable))
+            .route("/consumables/{id}", web::put().to(consumable::update_consumable))
+            .route("/consumables/{id}", web::delete().to(consumable::delete_consumable))
+            .route(
+                "/consumables/{id}/consumption",
+                web::get().to(consumable::list_consumption),
+            )
+            .route(
+                "/consumables/{id}/consumption",
+                web::post().to(consumable::add_consumption),
+            )
             // ---- 统计 ----
             .route("/stats/overview", web::get().to(stats::overview))
             .route("/stats/popular", web::get().to(stats::popular))
@@ -85,6 +102,11 @@ pub fn configure(cfg: &mut web::ServiceConfig, upload_dir: PathBuf) {
             // ---- 菜谱（静态段必须放在 {id} 之前）----
             .route("/recipes/facets", web::get().to(recipes::list_facets))
             .route("/recipes/random", web::get().to(recipes::random_recipes))
+            .route(
+                "/recipes/import/preview",
+                web::post().to(importer::import_preview),
+            )
+            .route("/recipes/import", web::post().to(importer::import_recipe))
             .route("/recipes", web::get().to(recipes::list_recipes))
             .route("/recipes", web::post().to(recipes::create_recipe))
             .route("/recipes/{id}", web::get().to(recipes::get_recipe))

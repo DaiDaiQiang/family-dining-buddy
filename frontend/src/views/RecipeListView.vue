@@ -13,6 +13,7 @@ import { useAppStore } from '@/stores/app'
 import DishCard from '@/components/DishCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import YanLoader from '@/components/YanLoader.vue'
+import RecipeImportDialog from '@/components/RecipeImportDialog.vue'
 import { toast } from '@/composables/useToast'
 
 defineOptions({ name: 'RecipeListView' })
@@ -25,6 +26,7 @@ const app = useAppStore()
 const keyword = ref(store.filters.keyword)
 const sortOpen = ref(false)
 const listRef = ref(null)
+const importOpen = ref(false)
 
 const sorts = [
   { value: 'rating', label: '评分最高', icon: '⭐' },
@@ -84,6 +86,10 @@ function addToCart(recipe) {
   toast.success(`已加入「${recipe.name}」`)
 }
 
+function onImported() {
+  store.fetchList()
+}
+
 // 无限滚动
 function onScroll() {
   const el = listRef.value
@@ -139,6 +145,7 @@ onMounted(() => {
         </span>
         <div class="toolbar-actions">
           <button v-if="store.hasActiveFilter" class="tool-btn" @click="resetAll">重置</button>
+          <button class="tool-btn tool-btn--import" @click="importOpen = true">🔗 导入</button>
           <button class="tool-btn" @click="sortOpen = !sortOpen">
             {{ currentSort.icon }} {{ currentSort.label }}
             <span class="tool-caret" :class="{ up: sortOpen }">▾</span>
@@ -193,6 +200,9 @@ onMounted(() => {
     <button class="fab" @click="router.push('/recipes/new')" aria-label="新建菜谱">
       <span>＋</span>
     </button>
+
+    <!-- 下厨房导入弹窗 -->
+    <RecipeImportDialog v-model:visible="importOpen" @imported="onImported" />
   </div>
 </template>
 

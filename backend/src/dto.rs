@@ -1,6 +1,6 @@
 ﻿//! 请求体 DTO 与参数校验。
 
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use serde::Deserialize;
 
 use crate::error::ApiError;
@@ -492,3 +492,47 @@ pub struct PutSyncReq {
     /// 乐观版本号：与库中不一致时拒绝覆盖（可省略，省略则直接覆盖）
     pub expected_version: Option<u32>,
 }
+
+// =====================================================================
+//  阶段 3 · 耗材维护与消耗统计
+// =====================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct CreateConsumableReq {
+    pub name: Option<String>,
+    pub category: Option<String>,
+    pub unit: Option<String>,
+    pub emoji: Option<String>,
+    pub stock: Option<f64>,
+    pub low_threshold: Option<f64>,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateConsumableReq {
+    pub name: Option<String>,
+    pub category: Option<String>,
+    pub unit: Option<String>,
+    pub emoji: Option<String>,
+    pub stock: Option<f64>,
+    pub low_threshold: Option<f64>,
+    pub note: Option<String>,
+    pub is_active: Option<bool>,
+}
+
+/// 消耗登记：consumable_id 或 name 二选一（name 用于快捷补记时自动匹配）
+#[derive(Debug, Deserialize)]
+pub struct AddConsumptionReq {
+    pub consumable_id: Option<u64>,
+    pub name: Option<String>,
+    /// 本次消耗量，正数
+    pub quantity: f64,
+    pub member_id: Option<u64>,
+    pub note: Option<String>,
+    /// 缺省为当前时间
+    pub occurred_at: Option<NaiveDateTime>,
+}
+
+/// 耗材分类取值（与 util 保持一致）
+pub const CONSUMABLE_CATEGORIES: [&str; 5] = ["清洁", "纸品", "调味料", "个护", "其他"];
+

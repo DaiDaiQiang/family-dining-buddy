@@ -455,7 +455,7 @@ pub async fn create_order(
         let recipe_id = match (item.recipe_id, item.new_recipe.as_ref()) {
             (Some(id), _) if id > 0 => id,
             (_, Some(new)) => {
-                let rid = insert_recipe_in_tx(&mut *tx, new).await?;
+                let (rid, _final_name) = insert_recipe_in_tx(&mut *tx, new).await?;
                 created_recipe_ids.push(rid);
                 rid
             }

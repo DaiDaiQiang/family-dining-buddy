@@ -552,12 +552,49 @@ pub async fn replace_tags(
 //  建档 / 更新 / 删除 / 收藏
 // =====================================================================
 
+/// 解析最终菜名：若与库中已有菜重名，则自动追加序号「(2)」「(3)」……
+/// 直到不冲突为止。用于加菜撞名时不再硬报错，而是自动改名继续建档。
+async fn resolve_recipe_name(
+    tx: &mut MySqlConnection,
+    base: &str,
+) -> Result<String, ApiError> {
+    async fn name_exists(tx: &mut MySqlConnection, name: &str) -> Result<bool, ApiError> {
+        let (c,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM recipe WHERE name = ?")
+            .bind(name)
+            .fetch_one(&mut *tx)
+            .await?;
+        Ok(c > 0)
+    }
+
+    if !name_exists(tx, base).await? {
+        return Ok(base.to_string());
+    }
+
+    let mut i = 2u32;
+    loop {
+        let candidate = format!("{base}({i})");
+        // 候选名不能超过 64 字符（数据库列宽），超了直接报错提示换名
+        if candidate.chars().count() > 64 {
+            return Err(ApiError::BadRequest(
+                "菜名过短或重名次数过多，无法自动生成可用名称，请换一个更具体的菜名".into(),
+            ));
+        }
+        if !name_exists(tx, &candidate).await? {
+            return Ok(candidate);
+        }
+        i += 1;
+    }
+}
+
 /// 建档核心逻辑，供 `POST /api/recipes` 与「下单顺手建档」共用。
 /// 必须在调用方已开启的事务中执行。
+///
+/// 返回 `(菜谱 id, 最终菜名)`。若菜名与库中已有菜重名，
+/// 会自动追加序号（如「可乐鸡翅(2)」）而不是报错拒绝。
 pub async fn insert_recipe_in_tx(
     tx: &mut MySqlConnection,
     req: &CreateRecipeReq,
-) -> Result<u64, ApiError> {
+) -> Result<(u64, String), ApiError> {
     let (
         name,
         category,
@@ -570,7 +607,7 @@ pub async fn insert_recipe_in_tx(
         cover_gradient,
     ) = validate_recipe_fields(req)?;
 
-    let name = name.ok_or_else(|| ApiError::BadRequest("菜名不能为空".into()))?;
+    let base_name = name.ok_or_else(|| ApiError::BadRequest("菜名不能为空".into()))?;
 
     for (label, value) in [
         ("简介", req.description.as_deref()),
@@ -593,13 +630,16 @@ pub async fn insert_recipe_in_tx(
         }
     }
 
+    // 撞名自动加序号，避免唯一键冲突硬报错
+    let final_name = resolve_recipe_name(tx, &base_name).await?;
+
     let result = sqlx::query(
         "INSERT INTO recipe \
          (name, category, cuisine, difficulty, prep_minutes, cook_minutes, servings, \
           cover_emoji, cover_gradient, cover_url, description, tips, calories, is_active, created_by) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(&name)
+    .bind(&final_name)
     .bind(&category)
     .bind(&cuisine)
     .bind(&difficulty)
@@ -629,7 +669,7 @@ pub async fn insert_recipe_in_tx(
         replace_steps(tx, id, steps).await?;
     }
 
-    Ok(id)
+    Ok((id, final_name))
 }
 
 /// POST /api/recipes
@@ -641,11 +681,24 @@ pub async fn create_recipe(
     let req = body.into_inner();
 
     let mut tx = pool.begin().await?;
-    let id = insert_recipe_in_tx(&mut *tx, &req).await?;
+    let (id, final_name) = insert_recipe_in_tx(&mut *tx, &req).await?;
     tx.commit().await?;
 
+    // 撞名自动改名时，在 message 里告知最终菜名，前端据此提示
+    let requested = req
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let message = match requested {
+        Some(r) if r != final_name => {
+            format!("菜名「{r}」已存在，已自动命名为「{final_name}」")
+        }
+        _ => "菜谱已建档".to_string(),
+    };
+
     Ok(ok_with_message(
-        "菜谱已建档",
+        message,
         build_recipe_detail(pool, id).await?,
     ))
 }

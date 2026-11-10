@@ -16,6 +16,7 @@ const acting = ref(false)
 const TYPE_META = {
   health: { label: '健康', emoji: '🌸', color: '#E91E63' },
   parcel: { label: '快递', emoji: '📦', color: '#FF8A65' },
+  consumable: { label: '耗材', emoji: '🧴', color: '#C2703D' },
   bill: { label: '账单', emoji: '💰', color: '#C98A1E' },
   device: { label: '设备', emoji: '🔌', color: '#4F8A5B' },
   other: { label: '其他', emoji: '📌', color: '#6E7F96' }
@@ -69,7 +70,7 @@ onMounted(() => store.load())
   <div class="rc">
     <header class="rc-head">
       <h1 class="rc-title">🔔 提醒中心</h1>
-      <p class="rc-sub font-kai">经期推算 · 快递超时，站内自动提醒</p>
+      <p class="rc-sub font-kai">经期推算 · 快递超时 · 耗材补货，站内自动提醒</p>
       <button class="rc-sync" :disabled="store.loading" @click="store.load()">
         {{ store.loading ? '同步中…' : '同步生成' }}
       </button>
@@ -122,7 +123,7 @@ onMounted(() => store.load())
       <div class="rc-empty-emoji">{{ tab === 'pending' ? '🍵' : '🗂️' }}</div>
       <p>{{ tab === 'pending' ? '没有待办提醒，岁月静好' : '这里还没有记录' }}</p>
       <p v-if="tab === 'pending'" class="rc-empty-tip">
-        提醒由系统自动生成：经期预计开始、快递到件超 2 天未取
+        提醒由系统自动生成：经期预计开始、快递到件超 2 天未取、耗材库存低于预警线
       </p>
     </div>
   </div>

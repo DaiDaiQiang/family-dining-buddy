@@ -52,7 +52,7 @@ pub async fn list_reminders(
     if let Some(t) = clean(query.reminder_type.as_deref()) {
         validate_enum(
             &t,
-            &["health", "parcel", "bill", "device", "other"],
+            &["health", "parcel", "bill", "device", "consumable", "other"],
             "提醒类型",
         )?;
     }
@@ -300,6 +300,50 @@ async fn build_wanted(pool: &sqlx::MySqlPool) -> Result<Vec<Wanted>, ApiError> {
                 "kind": "parcel_overdue",
                 "parcel_id": p.id,
                 "days_overdue": days,
+            }),
+        });
+    }
+
+    // ---- 耗材低库存（阶段 3）：库存 <= 预警阈值 且阈值 > 0 ----
+    #[derive(sqlx::FromRow)]
+    struct LowStockRow {
+        id: u64,
+        name: String,
+        unit: String,
+        emoji: String,
+        stock: rust_decimal::Decimal,
+        low_threshold: rust_decimal::Decimal,
+    }
+    let low_stock: Vec<LowStockRow> = sqlx::query_as(
+        "SELECT id, name, unit, emoji, stock, low_threshold \
+         FROM consumable \
+         WHERE is_active = 1 AND low_threshold > 0 AND stock <= low_threshold",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    for c in low_stock {
+        let due_at = today
+            .and_hms_opt(10, 0, 0)
+            .ok_or_else(|| ApiError::Internal("提醒时间构造失败".into()))?;
+        let source = format!("consumable-low:{}", c.id);
+        let text = if c.stock <= rust_decimal::Decimal::ZERO {
+            format!("「{}」已用完，需尽快补充", c.name)
+        } else {
+            format!("「{}」仅剩 {} {}（预警线 {}）", c.name, c.stock, c.unit, c.low_threshold)
+        };
+        wanted.push(Wanted {
+            source: source.clone(),
+            member_id: None,
+            reminder_type: "consumable".into(),
+            title: text,
+            due_at,
+            payload: serde_json::json!({
+                "source": source,
+                "kind": "consumable_low",
+                "consumable_id": c.id,
+                "stock": c.stock,
+                "low_threshold": c.low_threshold,
             }),
         });
     }

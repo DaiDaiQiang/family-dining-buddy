@@ -381,6 +381,59 @@ pub struct Reminder {
 }
 
 // =====================================================================
+//  阶段 3 · 耗材维护与消耗统计
+// =====================================================================
+
+/// 耗材档案
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct Consumable {
+    pub id: u64,
+    pub name: String,
+    pub category: String,
+    pub unit: String,
+    pub emoji: String,
+    pub stock: Decimal,
+    pub low_threshold: Decimal,
+    pub note: Option<String>,
+    pub is_active: bool,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+/// 耗材消耗记录（含耗材名称/单位快照，供列表直接展示）
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct ConsumableLog {
+    pub id: u64,
+    pub consumable_id: u64,
+    pub consumable_name: String,
+    pub unit: String,
+    pub emoji: String,
+    pub quantity: Decimal,
+    pub member_id: Option<u64>,
+    pub member_name: Option<String>,
+    pub note: Option<String>,
+    pub occurred_at: NaiveDateTime,
+}
+
+/// 耗材消耗统计（累计 / 本月 / 近30天）
+#[derive(Debug, Clone, Serialize)]
+pub struct ConsumableStats {
+    pub total_count: i64,
+    pub total_quantity: Decimal,
+    pub month_count: i64,
+    pub month_quantity: Decimal,
+    pub last30_quantity: Decimal,
+    /// 近 30 天逐日消耗量（日期 → 数量，供前端折线图）
+    pub daily: Vec<DailyConsumption>,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct DailyConsumption {
+    pub day: NaiveDate,
+    pub quantity: Decimal,
+}
+
+// =====================================================================
 //  系统版本更新记录（个人中心 · 版本详情）
 // =====================================================================
 

@@ -99,6 +99,12 @@ const routes = [
     meta: { title: '提醒中心', back: true }
   },
   {
+    path: '/tools/consumables',
+    name: 'consumables',
+    component: () => import('@/views/ConsumableView.vue'),
+    meta: { title: '耗材管理', back: true }
+  },
+  {
     path: '/tools/study',
     name: 'study',
     component: () => import('@/views/StudyView.vue'),

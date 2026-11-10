@@ -80,4 +80,13 @@ function back() {
   justify-content: flex-end;
   gap: 6px;
 }
+
+@media (max-width: 699px) {
+  .topbar-back {
+    width: 34px; height: 34px;
+    margin-left: -6px;
+  }
+  .topbar-title { font-size: 16px; }
+  .topbar-actions { min-width: 34px; }
+}
 </style>

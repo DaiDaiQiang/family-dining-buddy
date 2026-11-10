@@ -13,7 +13,8 @@ const MIGRATIONS = [
   { label: '阶段 1 · 家庭管理底座', file: '03_phase1_family_hub.sql' },
   { label: '阶段 2 · 家庭档案扩展', file: '04_phase2_profile_reminder.sql' },
   { label: '阶段 5 · 成员头像图片', file: '05_member_avatar_url.sql' },
-  { label: '系统版本 · 更新记录', file: '06_system_version.sql' }
+  { label: '系统版本 · 更新记录', file: '06_system_version.sql' },
+  { label: '阶段 3 · 耗材维护与消耗统计', file: '07_consumable.sql' }
 ]
 
 async function main() {
@@ -72,7 +73,7 @@ async function main() {
     )
     console.log(`  ${label.padEnd(24)} ${row.n > 0 ? '✓ 已就绪' : '✗ 缺失'}`)
   }
-  for (const t of ['ledger_entry', 'parcel', 'health_profile', 'member_data', 'app_setting', 'reminder', 'system_version']) {
+  for (const t of ['ledger_entry', 'parcel', 'health_profile', 'member_data', 'app_setting', 'reminder', 'system_version', 'consumable', 'consumable_log']) {
     const [[row]] = await conn.query(
       "SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME=?",
       [DB.database, t]

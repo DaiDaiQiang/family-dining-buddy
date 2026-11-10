@@ -215,7 +215,13 @@ async function submit() {
       toast.success('菜谱已更新')
     } else {
       saved = await store.createRecipe(payload)
-      toast.success('菜谱已建档')
+      // 撞名自动改名：后端已自动追加序号，这里提示用户最终名字
+      const typedName = (payload.name || '').trim()
+      if (saved && saved.name && saved.name !== typedName) {
+        toast.success(`菜名「${typedName}」已存在，已自动命名为「${saved.name}」`, 3200)
+      } else {
+        toast.success('菜谱已建档')
+      }
       // 从点餐页顺手建档：建好后直接加入点餐单
       if (fromCart && saved) {
         cart.add(saved, 1, app.currentMember?.id)

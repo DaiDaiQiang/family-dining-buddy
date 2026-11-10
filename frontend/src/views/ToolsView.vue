@@ -13,6 +13,7 @@ import { useHealthStore } from '@/stores/health'
 import { useParcelStore } from '@/stores/parcel'
 import { useStudyStore } from '@/stores/study'
 import { useReminderStore } from '@/stores/reminder'
+import { useConsumableStore } from '@/stores/consumable'
 
 defineOptions({ name: 'ToolsView' })
 
@@ -23,6 +24,7 @@ const health = useHealthStore()
 const parcel = useParcelStore()
 const study = useStudyStore()
 const reminder = useReminderStore()
+const consumable = useConsumableStore()
 
 /** 是否管理员（掌勺人）：家庭成员管理仅管理员可用 */
 const isAdmin = computed(() => app.currentMember?.role === 'admin')
@@ -91,6 +93,18 @@ const featured = computed(() => [
     summary: reminder.pendingCount
       ? `健康提醒 ${reminder.countByType.health || 0} 条 · 快递提醒 ${reminder.countByType.parcel || 0} 条`
       : ''
+  },
+  {
+    key: 'consumables',
+    emoji: '🧴',
+    title: '耗材管理',
+    desc: '洗洁精、纸巾、调味料的库存与消耗',
+    to: '/tools/consumables',
+    badge: consumable.lowCount ? `${consumable.lowCount} 种待补货` : '',
+    badgeLevel: 'danger',
+    summary: consumable.items.length
+      ? `在库 ${consumable.items.length} 种${consumable.lowCount ? ` · ${consumable.lowCount} 种待补货` : ''}`
+      : ''
   }
 ])
 
@@ -100,6 +114,7 @@ const allTools = computed(() => {
     { key: 'ledger', emoji: '📒', title: '记账', to: '/tools/ledger' },
     { key: 'health', emoji: '🌸', title: '经期提醒', to: '/tools/health' },
     { key: 'parcel', emoji: '📦', title: '快递取件码', to: '/tools/parcel' },
+    { key: 'consumables', emoji: '🧴', title: '耗材管理', to: '/tools/consumables' },
     {
       key: 'study',
       emoji: '🎓',

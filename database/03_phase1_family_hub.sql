@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS `app_setting` (
 CREATE TABLE IF NOT EXISTS `reminder` (
   `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '提醒ID',
   `member_id`  BIGINT UNSIGNED NULL                    COMMENT '归属成员（NULL=全家）',
-  `type`       ENUM('health','parcel','bill','device','other') NOT NULL COMMENT '类型',
+  `type`       ENUM('health','parcel','bill','device','consumable','other') NOT NULL COMMENT '类型',
   `title`      VARCHAR(128)    NOT NULL                COMMENT '提醒标题',
   `due_at`     DATETIME        NOT NULL                COMMENT '提醒时间',
   `status`     ENUM('pending','done','dismissed') NOT NULL DEFAULT 'pending' COMMENT '状态',
@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS `reminder` (
   KEY `idx_reminder_member` (`member_id`),
   CONSTRAINT `fk_reminder_member` FOREIGN KEY (`member_id`) REFERENCES `member`(`id`)
     ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `chk_reminder_type`   CHECK (`type` IN ('health','parcel','bill','device','other')),
+  CONSTRAINT `chk_reminder_type`   CHECK (`type` IN ('health','parcel','bill','device','consumable','other')),
   CONSTRAINT `chk_reminder_status` CHECK (`status` IN ('pending','done','dismissed'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='提醒中心';
 

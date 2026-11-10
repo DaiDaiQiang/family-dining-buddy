@@ -12,6 +12,7 @@ import { useRecipeStore } from '@/stores/recipe'
 import { useHealthStore } from '@/stores/health'
 import { useParcelStore, courierMeta, stationMeta, formatCode } from '@/stores/parcel'
 import { useReminderStore } from '@/stores/reminder'
+import { useConsumableStore } from '@/stores/consumable'
 import { api } from '@/api'
 import DishCard from '@/components/DishCard.vue'
 import DishCover from '@/components/DishCover.vue'
@@ -29,6 +30,7 @@ const cart = useCartStore()
 const recipeStore = useRecipeStore()
 const health = useHealthStore()
 const parcel = useParcelStore()
+const consumable = useConsumableStore()
 
 const loading = ref(true)
 const overview = ref(null)
@@ -54,6 +56,8 @@ async function load() {
   } finally {
     loading.value = false
   }
+  // 耗材低库存（供滚动栏提示），失败静默
+  consumable.loadLow().catch(() => {})
 }
 
 onActivated(() => {
@@ -109,6 +113,13 @@ const healthAlerts = computed(() => health.alerts)
 const reminder = useReminderStore()
 const reminderBrief = computed(() => reminder.brief)
 const reminderPending = computed(() => reminder.pendingCount)
+
+/** 耗材低库存（阶段 3）：滚动栏提示补货，取前 3 种 */
+const lowStock = computed(() => consumable.lowStock.slice(0, 3))
+const hasLowStock = computed(() => consumable.lowCount > 0)
+const lowStockText = computed(() =>
+  lowStock.value.map((c) => `${c.emoji}${c.name} ${Number(c.stock)}${c.unit}`).join('　')
+)
 
 /** ---------- 快递代取（全家待取件）：有包裹才占一屏 ---------- */
 const parcelGroups = computed(() => parcel.pendingByMember)
@@ -197,6 +208,11 @@ watch(hasParcel, async () => {
   await nextTick()
   measureDots()
 })
+// 低库存耗材增减时，重测滚动圆点
+watch(hasLowStock, async () => {
+  await nextTick()
+  measureDots()
+})
 
 function addToCart(recipe) {
   cart.add(recipe, 1, member.value?.id)
@@ -251,6 +267,20 @@ function goOrder() { router.push('/order') }
             <div class="alert-main">
               <p class="slide-tag alert-tag">{{ a.title }}</p>
               <p class="alert-text ellipsis-2">{{ a.text }}</p>
+            </div>
+            <span class="alert-go">›</span>
+          </section>
+
+          <!-- 耗材低库存：滚动栏提示补货，点击跳转耗材管理 -->
+          <section
+            v-if="hasLowStock"
+            class="car-slide slide-alert alert-warning"
+            @click="router.push('/tools/consumables')"
+          >
+            <span class="alert-emoji">🧴</span>
+            <div class="alert-main">
+              <p class="slide-tag alert-tag">耗材补货 · {{ consumable.lowCount }} 种待补</p>
+              <p class="alert-text ellipsis-2">{{ lowStockText }}</p>
             </div>
             <span class="alert-go">›</span>
           </section>
@@ -460,6 +490,10 @@ function goOrder() { router.push('/order') }
 
 <style scoped>
 /* ---------- Hero ---------- */
+/* 首页顶部：柔和的焦糖→奶油长渐变，覆盖状态栏 + 问候区 + 滚动模块 */
+.home {
+  background: linear-gradient(180deg, #D9A46A 0%, #E7BC8B 260px, var(--bg) 320px, var(--bg) 100%);
+}
 .hero {
   position: relative;
   overflow: hidden;
@@ -469,15 +503,15 @@ function goOrder() { router.push('/order') }
 }
 .hero-bg {
   position: absolute; inset: 0;
-  background: linear-gradient(135deg, #C2703D 0%, #A85A2E 45%, #8A4522 100%);
+  background: linear-gradient(135deg, #D9A46A 0%, #C98752 45%, #B97942 100%);
   z-index: -2;
 }
 .hero-bg::after {
   content: '';
   position: absolute; inset: 0;
   background:
-    radial-gradient(70% 50% at 85% 10%, rgba(255,255,255,.16), transparent 60%),
-    radial-gradient(60% 60% at 10% 100%, rgba(120,20,20,.22), transparent 55%);
+    radial-gradient(70% 50% at 85% 10%, rgba(255,255,255,.18), transparent 60%),
+    radial-gradient(60% 60% at 10% 100%, rgba(180,120,70,.16), transparent 55%);
 }
 .hero-body { position: relative; z-index: 1; }
 

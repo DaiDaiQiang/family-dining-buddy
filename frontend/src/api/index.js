@@ -124,6 +124,19 @@ export const api = {
     create: (data) => call('/versions', { method: 'post', data })
   },
 
+  // ---------- 耗材维护与消耗统计（阶段 3） ----------
+  consumables: {
+    list: (params) => call('/consumables', { params }),
+    low: () => call('/consumables/low'),
+    stats: () => call('/consumables/stats'),
+    create: (data) => call('/consumables', { method: 'post', data }),
+    update: (id, data) => call(`/consumables/${id}`, { method: 'put', data }),
+    remove: (id) => call(`/consumables/${id}`, { method: 'delete' }),
+    addConsumption: (id, data) =>
+      call(`/consumables/${id}/consumption`, { method: 'post', data }),
+    consumption: (id) => call(`/consumables/${id}/consumption`)
+  },
+
 
   // ---------- 统计 ----------
   stats: {
@@ -148,6 +161,10 @@ export const api = {
       call(`/recipes/${id}`, { method: 'delete', params: { permanent } }),
     toggleFavorite: (id, memberId) =>
       call(`/recipes/${id}/favorite/${memberId}`, { method: 'post' }),
+    /** 下厨房导入：抓取并解析链接，返回预览（不落库） */
+    importPreview: (url) => call('/recipes/import/preview', { method: 'post', data: { url } }),
+    /** 下厨房导入：确认后落库建档 */
+    importCreate: (data) => call('/recipes/import', { method: 'post', data }),
     /** 上传封面图：dataURL → 后端落盘，返回 { url }（仅在线可用） */
     uploadCover: (dataUrl) => http.post('/uploads', { data: dataUrl }, { timeout: 30000 })
   },
