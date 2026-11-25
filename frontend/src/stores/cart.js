@@ -25,7 +25,9 @@ export const useCartStore = defineStore('cart', {
     mealDate: new Date().toISOString().slice(0, 10),
     mealType: guessMealType(),
     diners: Number(localStorage.getItem('fd_diners')) || 3,
-    note: ''
+    note: '',
+    /** 最近一次加购的菜 id（供「飞入/角标」反馈用） */
+    lastAddedId: null
   }),
 
   getters: {
@@ -34,7 +36,9 @@ export const useCartStore = defineStore('cart', {
       Object.values(s.items).reduce((sum, i) => sum + (i.portions || 1), 0),
     entries: (s) =>
       Object.entries(s.items).map(([id, v]) => ({ id: Number(id), ...v })),
-    isEmpty: (s) => Object.keys(s.items).length === 0
+    isEmpty: (s) => Object.keys(s.items).length === 0,
+    /** 某道菜的当前份数（未加入则 0） */
+    qtyOf: (s) => (id) => s.items[Number(id)]?.portions || 0
   },
 
   actions: {
@@ -47,11 +51,19 @@ export const useCartStore = defineStore('cart', {
       }
     },
 
-    /** 加入一道菜；已在车里则份数 +1 */
+    /**
+     * 加入一道菜；已在车里则份数 +1。
+     * @returns {{ id:number, name:string, portions:number, merged:boolean }}
+     *   merged=true 表示这次是「再点一份」叠加，false 表示新加入。
+     */
     add(recipe, portions = 1, memberId = null, note = '') {
       const id = Number(recipe.id)
+      let merged = false
       if (this.items[id]) {
         this.items[id].portions = Math.min(20, this.items[id].portions + portions)
+        // 补充点餐人：新增时未指定，后续指定则更新
+        if (memberId && !this.items[id].memberId) this.items[id].memberId = Number(memberId)
+        merged = true
       } else {
         this.items[id] = {
           recipe: {
@@ -65,11 +77,13 @@ export const useCartStore = defineStore('cart', {
             calories: recipe.calories
           },
           portions,
-          memberId,
+          memberId: memberId ? Number(memberId) : null,
           note
         }
       }
+      this.lastAddedId = id
       this.persist()
+      return { id, name: recipe.name, portions: this.items[id].portions, merged }
     },
 
     /** 加入一道「尚未建档」的新菜（点餐时顺手建档） */
@@ -87,6 +101,22 @@ export const useCartStore = defineStore('cart', {
     setPortions(key, portions) {
       if (!this.items[key]) return
       this.items[key].portions = Math.max(1, Math.min(20, Number(portions) || 1))
+      this.persist()
+    },
+
+    /**
+     * 直接设置某道菜的数量；数量归零则从购物车移除。
+     * 用于列表页「－ 1 ＋」步进（减到 0 自动移除）。
+     */
+    setQuantity(id, qty) {
+      const key = Number(id)
+      const n = Math.max(0, Math.min(20, Number(qty) || 0))
+      if (n === 0) {
+        if (this.items[key]) delete this.items[key]
+      } else if (this.items[key]) {
+        this.items[key].portions = n
+      }
+      this.lastAddedId = null
       this.persist()
     },
 
@@ -112,6 +142,7 @@ export const useCartStore = defineStore('cart', {
     clear() {
       this.items = {}
       this.note = ''
+      this.lastAddedId = null
       this.persist()
     },
 

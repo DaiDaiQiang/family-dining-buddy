@@ -45,6 +45,12 @@ const routes = [
     meta: { title: '点餐', tab: 'order', keepAlive: true }
   },
   {
+    path: '/order/checkout',
+    name: 'order-checkout',
+    component: () => import('@/views/OrderCheckoutView.vue'),
+    meta: { title: '结算', back: true }
+  },
+  {
     path: '/orders',
     name: 'orders',
     component: () => import('@/views/OrderListView.vue'),
@@ -175,6 +181,7 @@ const router = createRouter({
  */
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  // 登录页：已登录回首页，未登录放行
   if (to.name === 'login') {
     return auth.loggedIn ? { name: 'home' } : true
   }

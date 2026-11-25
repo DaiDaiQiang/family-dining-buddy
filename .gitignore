@@ -35,6 +35,16 @@ deploy/**/dist/
 *.bin
 deploy/**/bin/
 
+# ===== 部署包 / 打包产物 =====
+deploy/*.zip
+deploy/family-dining-*.zip
+
+# ===== 备份文件 =====
+*.old
+*.old.*
+*.bak
+*.orig
+
 # ===== Rust =====
 *.rs.bk
 Cargo.lock.orig

@@ -114,3 +114,83 @@ pub async fn put_sync(
         serde_json::json!({ "key": key, "payload": payload, "version": version }),
     ))
 }
+
+/// GET /api/sync/shared/{key} —— 家庭共享数据（全家一份，任何人可读）
+pub async fn get_shared_sync(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    path: web::Path<SyncPath>,
+) -> Result<HttpResponse, ApiError> {
+    // 仅需登录即可读（current_claims 校验令牌有效），不区分成员
+    let _claims = current_claims(&req)?;
+    let pool = state.db()?;
+    let key = validate_key(&path.key)?;
+
+    let row: Option<(serde_json::Value, u32)> =
+        sqlx::query_as("SELECT payload, version FROM shared_data WHERE data_key = ?")
+            .bind(&key)
+            .fetch_optional(pool)
+            .await?;
+
+    match row {
+        Some((payload, version)) => Ok(ok(serde_json::json!({
+            "key": key,
+            "payload": payload,
+            "version": version,
+        }))),
+        None => Ok(ok(serde_json::json!({
+            "key": key,
+            "payload": null,
+            "version": 0,
+        }))),
+    }
+}
+
+/// PUT /api/sync/shared/{key} —— 家庭共享数据（任何登录成员可写，乐观锁防并发覆盖）
+pub async fn put_shared_sync(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+    path: web::Path<SyncPath>,
+    body: web::Json<PutSyncReq>,
+) -> Result<HttpResponse, ApiError> {
+    let _claims = current_claims(&req)?;
+    let pool = state.db()?;
+    let key = validate_key(&path.key)?;
+    let r = body.into_inner();
+
+    if let Some(expected) = r.expected_version {
+        let current: Option<u32> =
+            sqlx::query_scalar("SELECT version FROM shared_data WHERE data_key = ?")
+                .bind(&key)
+                .fetch_optional(pool)
+                .await?;
+
+        let cur = current.unwrap_or(0);
+        if cur != expected {
+            return Err(ApiError::Conflict(format!(
+                "共享数据已被其他成员更新（本地版本 {expected}，服务器版本 {cur}），请刷新后重试"
+            )));
+        }
+    }
+
+    sqlx::query(
+        "INSERT INTO shared_data (data_key, payload, version) \
+         VALUES (?, ?, 1) \
+         ON DUPLICATE KEY UPDATE payload = VALUES(payload), version = version + 1",
+    )
+    .bind(&key)
+    .bind(&r.payload)
+    .execute(pool)
+    .await?;
+
+    let (payload, version): (serde_json::Value, u32) =
+        sqlx::query_as("SELECT payload, version FROM shared_data WHERE data_key = ?")
+            .bind(&key)
+            .fetch_one(pool)
+            .await?;
+
+    Ok(ok_with_message(
+        "已保存",
+        serde_json::json!({ "key": key, "payload": payload, "version": version }),
+    ))
+}

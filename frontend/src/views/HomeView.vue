@@ -412,7 +412,7 @@ function goOrder() { router.push('/order') }
           <button class="section-more" @click="refreshSuggestion">🎲 换一批</button>
         </div>
         <div v-if="loading && !suggestions.length" class="rail">
-          <YanLoader v-for="i in 3" :key="i" class="rail-sk" :size="120" :blobs="false" :show-tip="false" />
+          <YanLoader v-for="i in 3" :key="i" class="rail-sk" :size="120" :blobs="false" :show-tip="false" :custom-gif="false" />
         </div>
         <div v-else-if="suggestions.length" class="rail">
           <DishCard

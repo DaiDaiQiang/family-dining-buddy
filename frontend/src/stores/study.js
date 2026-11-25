@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { api } from '@/api'
+import { useAuthStore } from '@/stores/auth'
 
 /**
  * 学习板块
@@ -253,14 +254,17 @@ function normalizeProgress(raw) {
   }
 }
 
-/** 题库元数据规范化：名称唯一，附带展示图片与说明 */
+/** 题库元数据规范化：名称唯一，附带展示图片与说明、可见范围、创建者 */
 function normalizeBank(raw) {
   const name = String(raw.name ?? raw.bank ?? raw.title ?? '').trim()
   if (!name) return null
+  const scope = raw.scope === 'public' ? 'public' : 'private'
   return {
     name,
     cover: String(raw.cover ?? raw.image ?? raw.cover_url ?? '').trim(),
-    desc: String(raw.desc ?? raw.description ?? raw.remark ?? '').trim()
+    desc: String(raw.desc ?? raw.description ?? raw.remark ?? '').trim(),
+    scope,
+    owner: raw.owner != null ? Number(raw.owner) : null
   }
 }
 
@@ -274,7 +278,6 @@ function emptyState() {
     progress: { questions: {}, words: {}, notes: {} }
   }
 }
-
 function readStore() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY))
@@ -369,7 +372,14 @@ export const useStudyStore = defineStore('study', {
     ...readStore(),
     seq: Number(localStorage.getItem(SEQ_KEY)) || 1,
     /** 最近一次导入结果，供界面展示 */
-    lastImport: null
+    lastImport: null,
+    /** 家庭共享题库（公有）：全家一份，独立于私有数据 */
+    sharedBanks: [],
+    sharedQuestions: [],
+    /** 共享题库的题目 id 序号（独立空间，避免与私有题 id 冲突） */
+    sharedSeq: Number(localStorage.getItem('fd_study_shared_seq')) || 1,
+    /** 共享数据加载标记 */
+    sharedLoaded: false
   }),
 
   getters: {
@@ -415,16 +425,32 @@ export const useStudyStore = defineStore('study', {
       return s.questions.filter((q) => s.progress.questions[q.id]?.last_result === 'wrong')
     },
 
+    /** 全部题目（私有 + 公有合并）；公有题 id 带 pub- 前缀以隔离进度 */
+    allQuestions(s) {
+      const priv = s.questions
+      const pub = s.sharedQuestions.map((q) => ({ ...q, id: `pub-${q.id}` }))
+      return [...priv, ...pub]
+    },
+
     /** 题库列表（含题量与元数据），刷题页选库用；按名称排序 */
     questionBanks(s) {
-      // 先按名称统计题量，并合并元数据（banks 里的图片/说明）
+      // 先按名称统计题量，并合并元数据（banks 里的图片/说明/范围）
       const map = new Map()
       s.banks.forEach((bk) => {
-        map.set(bk.name, { name: bk.name, cover: bk.cover, desc: bk.desc, count: 0 })
+        map.set(bk.name, { name: bk.name, cover: bk.cover, desc: bk.desc, scope: bk.scope, owner: bk.owner, count: 0 })
       })
       s.questions.forEach((q) => {
         const b = String(q.bank || '').trim() || DEFAULT_BANK
-        if (!map.has(b)) map.set(b, { name: b, cover: '', desc: '', count: 0 })
+        if (!map.has(b)) map.set(b, { name: b, cover: '', desc: '', scope: 'private', owner: null, count: 0 })
+        map.get(b).count += 1
+      })
+      // 公有题库（共享数据，全家庭可见）
+      s.sharedBanks.forEach((bk) => {
+        map.set(bk.name, { name: bk.name, cover: bk.cover, desc: bk.desc, scope: 'public', owner: bk.owner, count: 0 })
+      })
+      s.sharedQuestions.forEach((q) => {
+        const b = String(q.bank || '').trim() || DEFAULT_BANK
+        if (!map.has(b)) map.set(b, { name: b, cover: '', desc: '', scope: 'public', owner: null, count: 0 })
         map.get(b).count += 1
       })
       // 只保留仍有题目或带元数据的题库；纯元数据（0 题）也展示，便于轮盘切换
@@ -588,6 +614,57 @@ export const useStudyStore = defineStore('study', {
     nextId(prefix) {
       this.seq += 1
       return `${prefix}-${this.seq}`
+    },
+
+    /* ---------------- 共享题库（公有） ---------------- */
+
+    /** 共享题库整包载荷 */
+    sharedBundle() {
+      return {
+        banks: this.sharedBanks,
+        questions: this.sharedQuestions,
+        seq: this.sharedSeq
+      }
+    },
+
+    /** 本地缓存共享题库（降级展示用） */
+    persistSharedLocal() {
+      try {
+        localStorage.setItem(
+          'fd_study_shared',
+          JSON.stringify({ banks: this.sharedBanks, questions: this.sharedQuestions })
+        )
+        localStorage.setItem('fd_study_shared_seq', String(this.sharedSeq))
+      } catch (e) {
+        console.warn('共享题库本地缓存失败', e)
+      }
+    },
+
+    /** 推送共享题库到服务端（家庭共享一份） */
+    async persistShared() {
+      this.persistSharedLocal()
+      try {
+        await api.sync.putShared('study_shared', this.sharedBundle())
+      } catch (e) {
+        console.warn('共享题库同步失败', e)
+      }
+    },
+
+    /** 从服务端拉共享题库 */
+    async pullShared() {
+      try {
+        const res = await api.sync.getShared('study_shared')
+        const p = res && res.payload
+        if (p) {
+          this.sharedBanks = (Array.isArray(p.banks) ? p.banks : []).map(normalizeBank).filter(Boolean)
+          this.sharedQuestions = Array.isArray(p.questions) ? p.questions : []
+          if (p.seq) this.sharedSeq = Number(p.seq) || this.sharedSeq
+          this.persistSharedLocal()
+        }
+        this.sharedLoaded = true
+      } catch (e) {
+        console.warn('共享题库拉取失败', e)
+      }
     },
 
     /* ---------------- 学科 ---------------- */
@@ -771,16 +848,16 @@ export const useStudyStore = defineStore('study', {
       return this.questions.filter((q) => (String(q.bank || '').trim() || DEFAULT_BANK) === name).length
     },
 
-    /** 题库元数据是否存在（按名称精确匹配，名称唯一） */
+    /** 题库元数据是否存在（按名称精确匹配，私有+公有统一查重，名称唯一） */
     bankExists(bankName) {
       const name = String(bankName || '').trim()
       if (!name) return false
-      return this.banks.some((b) => b.name === name)
+      return this.banks.some((b) => b.name === name) || this.sharedBanks.some((b) => b.name === name)
     },
 
     /**
      * 写入/更新题库元数据（名称唯一；不存在则新增，存在则覆盖图片与说明）
-     * @param {{name:string, cover?:string, desc?:string}} raw
+     * @param {{name:string, cover?:string, desc?:string, scope?:string}} raw
      */
     saveBank(raw) {
       const bk = normalizeBank(raw)
@@ -790,6 +867,136 @@ export const useStudyStore = defineStore('study', {
       else this.banks.push(bk)
       this.persist()
       return bk
+    },
+
+    /**
+     * 删除题库（连带删除题库下所有题目，不可恢复）
+     * @param {string} bankName 题库名
+     * @param {'private'|'public'} scope 题库范围
+     */
+    removeBank(bankName, scope = 'private') {
+      const name = String(bankName || '').trim()
+      if (!name) throw new Error('题库名称不能为空')
+      if (scope === 'public') {
+        // 公有题库：从共享数据删除，同步到服务端
+        const removedIds = this.sharedQuestions
+          .filter((q) => (String(q.bank || '').trim() || DEFAULT_BANK) === name)
+          .map((q) => q.id)
+        this.sharedQuestions = this.sharedQuestions.filter(
+          (q) => (String(q.bank || '').trim() || DEFAULT_BANK) !== name
+        )
+        this.sharedBanks = this.sharedBanks.filter((b) => b.name !== name)
+        removedIds.forEach((id) => delete this.progress.questions[`pub-${id}`])
+        this.persistShared()
+      } else {
+        // 私有题库：删除题目与元数据、对应进度
+        const removedIds = this.questions
+          .filter((q) => (String(q.bank || '').trim() || DEFAULT_BANK) === name)
+          .map((q) => q.id)
+        this.questions = this.questions.filter(
+          (q) => (String(q.bank || '').trim() || DEFAULT_BANK) !== name
+        )
+        this.banks = this.banks.filter((b) => b.name !== name)
+        removedIds.forEach((id) => delete this.progress.questions[id])
+        this.persist()
+      }
+      return removedIds?.length || 0
+    },
+
+    /**
+     * 修改题库：名称 / 图片 / 说明 / 可见范围（公有↔私有）
+     * @param {string} bankName 原名称
+     * @param {'private'|'public'} scope 原范围
+     * @param {{name?:string, cover?:string, desc?:string, scope?:string}} patch 修改内容
+     * @returns {Promise<object>} 结果（改范围涉及跨域迁移，需异步）
+     */
+    async updateBank(bankName, scope = 'private', patch = {}) {
+      const oldName = String(bankName || '').trim()
+      if (!oldName) throw new Error('题库名称不能为空')
+      const newName = String(patch.name ?? oldName).trim()
+      if (!newName) throw new Error('题库名称不能为空')
+      const newScope = patch.scope === 'public' ? 'public' : (patch.scope === 'private' ? 'private' : scope)
+
+      // 改名时查重（跨私有+公有，排除自己）
+      if (newName !== oldName) {
+        const clash = this.banks.some((b) => b.name === newName && b.name !== oldName) ||
+          this.sharedBanks.some((b) => b.name === newName && b.name !== oldName)
+        if (clash) throw new Error(`题库名称「${newName}」已存在，请换一个`)
+      }
+
+      // 范围变化（私有→公有 / 公有→私有）：需要迁移题目
+      if (newScope !== scope) {
+        if (scope === 'private' && newScope === 'public') {
+          // 私有 → 公有：把该题库的题目和元数据搬到共享数据
+          const qs = this.questions.filter((q) => (String(q.bank || '').trim() || DEFAULT_BANK) === oldName)
+          const bk = this.banks.find((b) => b.name === oldName)
+          this.questions = this.questions.filter((q) => (String(q.bank || '').trim() || DEFAULT_BANK) !== oldName)
+          this.banks = this.banks.filter((b) => b.name !== oldName)
+          // 存储层 id 保持原样；展示层（allQuestions）会统一加 pub- 前缀隔离进度
+          const movedQ = qs.map((q) => ({ ...q, bank: newName }))
+          this.sharedQuestions.push(...movedQ)
+          const nb = normalizeBank({ name: newName, cover: bk?.cover ?? patch.cover ?? '', desc: bk?.desc ?? patch.desc ?? '', scope: 'public', owner: this.currentMemberId() })
+          this.sharedBanks = this.sharedBanks.filter((b) => b.name !== oldName)
+          if (nb) this.sharedBanks.push(nb)
+          // 迁移进度：私有进度 key → 公有进度 key（pub- 前缀）
+          qs.forEach((q) => {
+            const p = this.progress.questions[q.id]
+            if (p) { this.progress.questions[`pub-${q.id}`] = p; delete this.progress.questions[q.id] }
+          })
+          this.persist()
+          await this.persistShared()
+        } else {
+          // 公有 → 私有：搬到个人数据
+          const qs = this.sharedQuestions.filter((q) => (String(q.bank || '').trim() || DEFAULT_BANK) === oldName)
+          const bk = this.sharedBanks.find((b) => b.name === oldName)
+          this.sharedQuestions = this.sharedQuestions.filter((q) => (String(q.bank || '').trim() || DEFAULT_BANK) !== oldName)
+          this.sharedBanks = this.sharedBanks.filter((b) => b.name !== oldName)
+          const movedQ = qs.map((q) => ({ ...q, bank: newName }))
+          this.questions.push(...movedQ)
+          const nb = normalizeBank({ name: newName, cover: bk?.cover ?? patch.cover ?? '', desc: bk?.desc ?? patch.desc ?? '', scope: 'private', owner: null })
+          this.banks = this.banks.filter((b) => b.name !== oldName)
+          if (nb) this.banks.push(nb)
+          qs.forEach((q) => {
+            const p = this.progress.questions[`pub-${q.id}`]
+            if (p) { this.progress.questions[q.id] = p; delete this.progress.questions[`pub-${q.id}`] }
+          })
+          this.persist()
+          await this.persistShared()
+        }
+      } else {
+        // 范围不变：只改元数据（名称/图片/说明）
+        const meta = { name: newName, cover: patch.cover, desc: patch.desc }
+        if (scope === 'public') {
+          const i = this.sharedBanks.findIndex((b) => b.name === oldName)
+          if (i >= 0) {
+            this.sharedBanks[i] = { ...this.sharedBanks[i], ...normalizeBank({ ...this.sharedBanks[i], ...meta, scope: 'public' }) }
+          }
+          // 改名同步题目归属
+          if (newName !== oldName) {
+            this.sharedQuestions.forEach((q) => {
+              if ((String(q.bank || '').trim() || DEFAULT_BANK) === oldName) q.bank = newName
+            })
+          }
+          await this.persistShared()
+        } else {
+          const i = this.banks.findIndex((b) => b.name === oldName)
+          if (i >= 0) {
+            this.banks[i] = { ...this.banks[i], ...normalizeBank({ ...this.banks[i], ...meta, scope: 'private' }) }
+          }
+          if (newName !== oldName) {
+            this.questions.forEach((q) => {
+              if ((String(q.bank || '').trim() || DEFAULT_BANK) === oldName) q.bank = newName
+            })
+          }
+          this.persist()
+        }
+      }
+      return { ok: true, name: newName, scope: newScope }
+    },
+
+    /** 当前登录成员 id（用于记录公有题库创建者） */
+    currentMemberId() {
+      return Number(useAuthStore().memberId) || null
     },
 
     /**
@@ -805,10 +1012,16 @@ export const useStudyStore = defineStore('study', {
     importJSON(text, opt = {}) {
       const bankOverride = String(opt.bank || '').trim() || DEFAULT_BANK
       const bankAction = opt.bankAction === 'replace' ? 'replace' : 'merge'
+      const scope = opt.scope === 'public' ? 'public' : 'private'
       const parsed = parseStudyPayload(text)
       if (!parsed.ok) {
         this.lastImport = { ok: false, error: parsed.error, at: nowStr() }
         return this.lastImport
+      }
+
+      // 公有题库：走共享导入路径
+      if (scope === 'public') {
+        return this._importShared(bankOverride, parsed, opt)
       }
 
       const skipped = []
@@ -952,6 +1165,119 @@ export const useStudyStore = defineStore('study', {
     },
 
     /**
+     * 公有题库导入：题目 + 元数据写入家庭共享数据
+     * @param {string} bankName 题库名
+     * @param {object} parsed parseStudyPayload 的返回
+     * @param {object} opt { bankMeta, bankAction }
+     */
+    _importShared(bankName, parsed, opt = {}) {
+      const bankAction = opt.bankAction === 'replace' ? 'replace' : 'merge'
+      const skipped = []
+      const nextQuestions = []
+
+      parsed.payload.questions.forEach((raw, i) => {
+        const q = normalizeQuestion(raw, raw.id || this.nextSharedId('q'))
+        if (q.error) skipped.push({ kind: '题目', at: i + 1, id: raw?.id || '', reason: q.error })
+        else {
+          q.bank = bankName
+          // 存储时 id 保持原始；展示层（allQuestions）会统一加 pub- 前缀隔离进度
+          nextQuestions.push(q)
+        }
+      })
+
+      const total = parsed.payload.questions.length + parsed.payload.english.length + parsed.payload.notes.length + parsed.payload.subjects.length
+      if (!total) {
+        const error = '文件里没有可导入的数据（questions / english / notes 都是空的）'
+        this.lastImport = { ok: false, error, at: nowStr() }
+        return this.lastImport
+      }
+
+      const counter = { added: 0, updated: 0, removed: 0 }
+
+      // 替换：清掉该公有题库旧题
+      if (bankAction === 'replace') {
+        const removedIds = this.sharedQuestions
+          .filter((q) => (String(q.bank || '').trim() || DEFAULT_BANK) === bankName)
+          .map((q) => q.id)
+        this.sharedQuestions = this.sharedQuestions.filter(
+          (q) => (String(q.bank || '').trim() || DEFAULT_BANK) !== bankName
+        )
+        removedIds.forEach((id) => delete this.progress.questions[`pub-${id}`])
+        counter.removed = removedIds.length
+      }
+
+      const bankIndex = new Map()
+      this.sharedQuestions.forEach((q, i) => {
+        if ((String(q.bank || '').trim() || DEFAULT_BANK) === bankName) bankIndex.set(q.id, i)
+      })
+      const globalIds = new Set(this.sharedQuestions.map((q) => q.id))
+
+      nextQuestions.forEach((q) => {
+        if (bankAction === 'merge' && bankIndex.has(q.id)) {
+          const i = bankIndex.get(q.id)
+          this.sharedQuestions[i] = { ...this.sharedQuestions[i], ...q }
+          counter.updated += 1
+        } else {
+          if (globalIds.has(q.id)) {
+            let nid
+            do { nid = this.nextSharedId('q') } while (globalIds.has(nid))
+            q.id = nid
+          }
+          globalIds.add(q.id)
+          this.sharedQuestions.push(q)
+          counter.added += 1
+        }
+      })
+
+      // 元数据
+      let bankMeta = opt.bankMeta || null
+      if (!bankMeta) {
+        const fromPayload = (parsed.payload.banks || []).find((b) => {
+          const nm = normalizeBank(b)
+          return nm && nm.name === bankName
+        })
+        if (fromPayload) bankMeta = { cover: fromPayload.cover, desc: fromPayload.desc }
+      }
+      const bk = normalizeBank({
+        name: bankName,
+        cover: bankMeta?.cover ?? '',
+        desc: bankMeta?.desc ?? '',
+        scope: 'public',
+        owner: this.currentMemberId()
+      })
+      if (bk) {
+        const i = this.sharedBanks.findIndex((b) => b.name === bk.name)
+        if (i >= 0) this.sharedBanks[i] = { ...this.sharedBanks[i], ...bk }
+        else this.sharedBanks.push(bk)
+      }
+
+      // 公有题库导入不落私有进度，保持学习进度个人私有
+      this.persistShared()
+
+      const summary = {
+        bank: bankName,
+        bankAction,
+        scope: 'public',
+        added: counter.added,
+        updated: counter.updated,
+        removed: counter.removed,
+        subjects: 0,
+        questions: nextQuestions.length,
+        english: 0,
+        notes: 0,
+        skipped
+      }
+      this.lastImport = { ok: true, summary, at: nowStr(), meta: parsed.meta }
+      return this.lastImport
+    },
+
+    /** 共享题库题目 id 序号 */
+    nextSharedId(prefix) {
+      this.sharedSeq += 1
+      return `${prefix}-${this.sharedSeq}`
+    },
+
+    /**
      * 按 id（学科按 value）合并：已存在则覆盖字段，不存在则追加
      * @param {string} key state 里的列表名
      * @param {Array} list 规范化后的记录
@@ -1056,11 +1382,12 @@ export const useStudyStore = defineStore('study', {
       )
     },
 
-    /** 清空全部学习数据（含进度） */
+    /** 清空全部学习数据（含进度）；公有题库是家庭共享的，不受影响 */
     clearAll() {
       const s = emptyState()
       this.subjects = s.subjects
       this.questions = s.questions
+      this.banks = s.banks
       this.english = s.english
       this.notes = s.notes
       this.progress = s.progress

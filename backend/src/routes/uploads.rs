@@ -20,8 +20,8 @@ use crate::util::ok;
 
 static COUNTER: AtomicU32 = AtomicU32::new(0);
 
-/// 解码后图片字节上限（与前端 1080px JPEG 压缩后的典型体积匹配）
-const MAX_IMAGE_BYTES: usize = 1_400_000;
+/// 解码后图片字节上限（兼容头像/封面压缩图与用户自定义 GIF 加载动画）
+const MAX_IMAGE_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Deserialize)]
 pub struct UploadReq {

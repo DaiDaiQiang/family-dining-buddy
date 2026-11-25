@@ -78,12 +78,9 @@ onActivated(() => {
 })
 
 function addToCart(recipe) {
-  if (cart.has(recipe.id)) {
-    toast.info(`「${recipe.name}」已在点餐单里`)
-    return
-  }
-  cart.add(recipe, 1, app.currentMember?.id)
-  toast.success(`已加入「${recipe.name}」`)
+  // 点 + 直接加；已在车里则份数 +1，不再弹「已加入」拒绝
+  const res = cart.add(recipe, 1, app.currentMember?.id)
+  toast.success(res.merged ? `「${recipe.name}」再来一份（共 ${res.portions} 份）` : `已加入「${recipe.name}」`)
 }
 
 function onImported() {
@@ -201,6 +198,17 @@ onMounted(() => {
       <span>＋</span>
     </button>
 
+    <!-- 底部悬浮购物车条 -->
+    <transition name="cartbar">
+      <div v-if="!cart.isEmpty" class="cart-bar" @click="router.push('/order/checkout')">
+        <span class="cart-bar-emoji">🛒</span>
+        <span class="cart-bar-text">
+          已选 <b class="num">{{ cart.count }}</b> 道 · <b class="num">{{ cart.totalPortions }}</b> 份
+        </span>
+        <span class="cart-bar-go">去结算 ›</span>
+      </div>
+    </transition>
+
     <!-- 下厨房导入弹窗 -->
     <RecipeImportDialog v-model:visible="importOpen" @imported="onImported" />
   </div>
@@ -316,4 +324,30 @@ onMounted(() => {
   transition: transform var(--dur-fast) var(--ease-bounce);
 }
 .fab:active { transform: scale(.9) rotate(90deg); }
+
+/* ---------- 底部悬浮购物车条 ---------- */
+.cart-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 16px);
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  border-radius: var(--r-full);
+  background: var(--brand-gradient);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(79, 138, 91, .45);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cart-bar:active { transform: translateX(-50%) scale(.96); }
+.cart-bar-emoji { font-size: 20px; }
+.cart-bar-text { font-size: 14px; font-weight: 600; }
+.cart-bar-text b { font-weight: 800; }
+.cart-bar-go { font-size: 13px; font-weight: 700; opacity: .9; }
+.cartbar-enter-active, .cartbar-leave-active { transition: all var(--dur) var(--ease-bounce); }
+.cartbar-enter-from, .cartbar-leave-to { opacity: 0; transform: translateX(-50%) translateY(20px); }
 </style>

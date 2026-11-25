@@ -70,6 +70,7 @@ const totalIngredients = computed(() =>
 
 const favorited = computed(() => store.isFavorite(id))
 const inCart = computed(() => cart.has(id))
+const cartQty = computed(() => cart.items[id]?.portions || 0)
 
 async function toggleFav() {
   if (!app.currentMember) { toast.warn('请先在「家庭成员」选择你是谁'); router.push('/members'); return }
@@ -80,9 +81,8 @@ async function toggleFav() {
 }
 
 function addCart() {
-  cart.add(detail.value, 1, app.currentMember?.id)
-  toast.success(`已加入「${detail.value.name}」`)
-  router.push('/order')
+  const res = cart.add(detail.value, 1, app.currentMember?.id)
+  toast.success(res.merged ? `「${detail.value.name}」再来一份（共 ${res.portions} 份）` : `已加入「${detail.value.name}」`)
 }
 
 async function remove() {
@@ -221,8 +221,15 @@ async function remove() {
         <div class="page-body action-inner">
           <button class="btn btn--ghost btn--icon act-mini" @click="router.push(`/recipes/${id}/edit`)" aria-label="编辑">✎</button>
           <button class="btn btn--danger btn--icon act-mini" @click="remove" aria-label="下架">🗑</button>
-          <button class="btn btn--primary grow act-main" :class="{ 'act-added': inCart }" @click="inCart ? router.push('/order') : addCart()">
-            {{ inCart ? '✓ 已在点餐单，去看看' : '＋ 加入点餐单' }}
+          <button
+            v-if="inCart"
+            class="btn btn--soft act-checkout"
+            @click="router.push('/order/checkout')"
+          >
+            🛒 去结算
+          </button>
+          <button class="btn btn--primary grow act-main" :class="{ 'act-added': inCart }" @click="addCart">
+            {{ inCart ? `＋ 再来一份（${cartQty} 份）` : '＋ 加入点餐单' }}
           </button>
         </div>
       </div>
@@ -287,5 +294,6 @@ async function remove() {
 .act-mini { width: 44px; height: 44px; min-height: 44px; font-size: 18px; flex: none; }
 .act-main { height: 46px; }
 .act-added { background: var(--success) !important; box-shadow: 0 8px 22px rgba(46,158,107,.3); }
+.act-checkout { height: 46px; flex: none; }
 .bottom-space { height: 90px; }
 </style>

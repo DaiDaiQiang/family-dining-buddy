@@ -16,6 +16,8 @@ import {
   looseEq
 } from '@/stores/study'
 import { toast } from '@/composables/useToast'
+import { api } from '@/api'
+import { compressToJpeg } from '@/utils/image'
 
 defineOptions({ name: 'StudyQuizView' })
 
@@ -54,6 +56,101 @@ function enterBank() {
   fBank.value = activeBank.value.name
   resetFilterOthers()
   startPractice('order')
+}
+
+/* ---------------- 题库管理（修改 / 删除） ---------------- */
+
+/** 当前登录成员 id（判断公有题库是否可改/删） */
+const myId = computed(() => study.currentMemberId())
+
+/** 当前选中的题库是否可管理（私有题库可改删；公有题库仅创建者可改删） */
+const canManageActive = computed(() => {
+  const b = activeBank.value
+  if (!b) return false
+  if (b.scope !== 'public') return true
+  return b.owner == null || b.owner === myId.value
+})
+
+/** 修改弹层 */
+const editingBank = ref(false)
+const editName = ref('')
+const editDesc = ref('')
+const editCover = ref('')
+const editScope = ref('private')
+const editCoverUploading = ref(false)
+const editCoverInput = ref(null)
+
+function openEditBank() {
+  const b = activeBank.value
+  if (!b) return
+  editName.value = b.name
+  editDesc.value = b.desc || ''
+  editCover.value = b.cover || ''
+  editScope.value = b.scope || 'private'
+  editingBank.value = true
+}
+
+async function onEditCoverPicked(e) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  editCoverUploading.value = true
+  try {
+    const dataUrl = await compressToJpeg(file, { maxSize: 800, quality: 0.85 })
+    const res = await api.uploads.create(dataUrl)
+    editCover.value = res?.url || dataUrl
+    toast.success('展示图片已更新')
+  } catch (err) {
+    toast.error(err?.message || '图片上传失败')
+  } finally {
+    editCoverUploading.value = false
+  }
+}
+
+async function submitEditBank() {
+  const b = activeBank.value
+  if (!b) return
+  const newName = editName.value.trim()
+  if (!newName) {
+    toast.warn('题库名称不能为空')
+    return
+  }
+  try {
+    const res = await study.updateBank(b.name, b.scope || 'private', {
+      name: newName,
+      cover: editCover.value,
+      desc: editDesc.value.trim(),
+      scope: editScope.value
+    })
+    editingBank.value = false
+    // 同步轮盘选中到改名后的题库
+    fBank.value = res.name
+    const idx = wheelBanks.value.findIndex((x) => x.name === res.name)
+    if (idx >= 0) wheelIndex.value = idx
+    toast.success('题库已更新')
+  } catch (err) {
+    toast.error(err?.message || '更新失败')
+  }
+}
+
+function removeActiveBank() {
+  const b = activeBank.value
+  if (!b) return
+  const scope = b.scope || 'private'
+  const count = b.count
+  const scopeNote = scope === 'public' ? '（家庭共享，删除后所有成员都看不到）' : ''
+  if (!confirm(`确定删除题库「${b.name}」吗？\n将同时删除 ${count} 道题${scopeNote}，且无法恢复。`)) return
+  try {
+    study.removeBank(b.name, scope)
+    // 删除后选中第一个剩余题库
+    const rest = wheelBanks.value
+    wheelIndex.value = 0
+    if (rest.length) fBank.value = rest[0].name
+    else fBank.value = ''
+    toast.success('题库已删除')
+  } catch (err) {
+    toast.error(err?.message || '删除失败')
+  }
 }
 
 /** 无封面时的降级背景色（按名称哈希取一组渐变色） */
@@ -163,7 +260,7 @@ const keyword = ref('')
 
 const filtered = computed(() => {
   const k = keyword.value.trim().toLowerCase()
-  return study.questions.filter((q) => {
+  return study.allQuestions.filter((q) => {
     const bank = String(q.bank || '').trim() || DEFAULT_BANK
     if (fBank.value && bank !== fBank.value) return false
     if (fSubject.value && q.subject !== fSubject.value) return false
@@ -183,7 +280,7 @@ const filtered = computed(() => {
 const banksInUse = computed(() => study.questionBanks)
 
 const subjectsInUse = computed(() => {
-  const set = new Set(study.questions.map((q) => q.subject).filter(Boolean))
+  const set = new Set(study.allQuestions.map((q) => q.subject).filter(Boolean))
   return study.allSubjects.filter((s) => set.has(s.value))
 })
 
@@ -241,7 +338,7 @@ function startPractice(mode = 'order') {
   let list = filtered.value
   if (mode === 'wrong') {
     // 错题本跨题库：只看错题，不受当前试卷筛选限制
-    list = study.questions.filter((q) => study.progress.questions[q.id]?.last_result === 'wrong')
+    list = study.allQuestions.filter((q) => study.progress.questions[q.id]?.last_result === 'wrong')
   } else if (mode === 'random') {
     list = shuffle(list)
   }
@@ -387,7 +484,9 @@ function optionClass(key) {
   return 'opt dim'
 }
 
-const wrongCount = computed(() => study.wrongQuestions.length)
+const wrongCount = computed(() =>
+  study.allQuestions.filter((q) => study.progress.questions[q.id]?.last_result === 'wrong').length
+)
 </script>
 
 <template>
@@ -396,13 +495,13 @@ const wrongCount = computed(() => study.wrongQuestions.length)
       <header class="q-head">
         <h1 class="q-title">✏️ 刷题</h1>
         <p class="q-sub">
-          共 {{ study.questions.length }} 道题 · {{ banksInUse.length }} 个题库
+          共 {{ study.allQuestions.length }} 道题 · {{ banksInUse.length }} 个题库
           <template v-if="wrongCount"> · <b class="warn">{{ wrongCount }} 道待订正</b></template>
         </p>
       </header>
 
       <!-- 空态 -->
-      <div v-if="!study.questions.length" class="empty">
+      <div v-if="!study.allQuestions.length" class="empty">
         <span class="empty-emoji">📭</span>
         <p class="empty-title">题库还是空的</p>
         <p class="empty-desc">回到「学习」页，用导入 JSON 把题目批量导进来</p>
@@ -478,11 +577,19 @@ const wrongCount = computed(() => study.wrongQuestions.length)
               <div class="wmeta">
                 <span class="wchip">📚 {{ activeBank.count }} 道题</span>
                 <span class="wchip wchip--ghost">试卷 {{ wheelIndex + 1 }} / {{ wheelBanks.length }}</span>
+                <span
+                  class="wchip"
+                  :class="activeBank.scope === 'public' ? 'wchip--public' : 'wchip--private'"
+                >{{ activeBank.scope === 'public' ? '👨‍👩‍👧 家庭共享' : '🔒 私有' }}</span>
               </div>
               <h2 class="wtitle">{{ activeBank.name }}</h2>
               <p class="wdesc">{{ activeBank.desc || '这份试卷还没有说明，点击「开始刷题」直接进入。' }}</p>
               <div class="wactions">
                 <button class="btn btn--primary" type="button" @click="enterBank">开始刷题</button>
+                <template v-if="canManageActive">
+                  <button class="btn btn--ghost btn--sm" type="button" @click="openEditBank">✏️ 修改</button>
+                  <button class="btn btn--danger-ghost btn--sm" type="button" @click="removeActiveBank">🗑 删除</button>
+                </template>
               </div>
             </div>
           </div>
@@ -697,6 +804,62 @@ const wrongCount = computed(() => study.wrongQuestions.length)
         </div>
       </div>
     </transition>
+
+    <!-- 修改题库弹层 -->
+    <transition name="sheet">
+      <div v-if="editingBank" class="sheet-mask" @click.self="editingBank = false">
+        <div class="sheet">
+          <div class="sheet-head">
+            <h2>修改题库</h2>
+            <button class="sheet-close" aria-label="关闭" @click="editingBank = false">✕</button>
+          </div>
+
+          <div class="sheet-body">
+            <div class="field">
+              <label class="field-label">题库名称 <span class="req">*</span></label>
+              <input v-model="editName" class="input" type="text" maxlength="30" placeholder="题库名称" />
+            </div>
+
+            <div class="field">
+              <label class="field-label">题库范围</label>
+              <div class="seg">
+                <button type="button" class="seg-btn" :class="{ on: editScope === 'private' }" @click="editScope = 'private'">🔒 私有</button>
+                <button type="button" class="seg-btn" :class="{ on: editScope === 'public' }" @click="editScope = 'public'">👨‍👩‍👧 家庭共享</button>
+              </div>
+              <p class="field-hint">
+                {{ editScope === 'public' ? '切换为家庭共享后，所有家庭成员都能看到这套题。' : '切换为私有后，只有你自己能看到这套题。' }}
+              </p>
+            </div>
+
+            <div class="field">
+              <label class="field-label">展示图片</label>
+              <div class="cover-row">
+                <div class="cover-preview" @click="editCoverInput?.click()">
+                  <img v-if="editCover" :src="editCover" alt="题库封面" />
+                  <span v-else class="cover-placeholder">{{ editCoverUploading ? '上传中…' : '＋ 上传封面' }}</span>
+                </div>
+                <div class="cover-side">
+                  <p class="field-hint">可选。刷题页轮盘上展示的封面图。</p>
+                  <button type="button" class="btn btn--ghost btn--sm" :disabled="editCoverUploading" @click="editCoverInput?.click()">选择图片</button>
+                  <button v-if="editCover" type="button" class="text-link" @click="editCover = ''">移除</button>
+                </div>
+              </div>
+              <input ref="editCoverInput" type="file" accept="image/*" class="sr-only" @change="onEditCoverPicked" />
+            </div>
+
+            <div class="field">
+              <label class="field-label">说明</label>
+              <textarea v-model="editDesc" class="textarea" rows="3" maxlength="200" placeholder="这套试卷的简介、适用范围等（可选）" />
+            </div>
+          </div>
+
+          <div class="sheet-foot">
+            <button class="btn btn--ghost grow" @click="editingBank = false">取消</button>
+            <button class="btn btn--primary grow" @click="submitEditBank">保存修改</button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -897,11 +1060,34 @@ const wrongCount = computed(() => study.wrongQuestions.length)
   background: var(--brand-50); border: 1px solid var(--brand-100);
 }
 .wchip--ghost { color: var(--text-2); background: var(--bg-subtle); border-color: var(--border); }
+.wchip--public { color: #0e7a5f; background: #e6f7f1; border-color: #b6e8d8; }
+.wchip--private { color: var(--text-2); background: var(--bg-subtle); border-color: var(--border); }
 .wtitle { margin: 0 0 8px; font-size: 20px; font-weight: 700; letter-spacing: -.01em; line-height: 1.35; }
 .wdesc { margin: 0 0 14px; font-size: 13px; line-height: 1.7; color: var(--text-2); }
-.wactions { display: flex; gap: 10px; }
+.wactions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn--danger-ghost {
+  background: transparent; border: 1px solid var(--danger); color: var(--danger);
+}
+.btn--danger-ghost:hover { background: var(--danger-bg); }
 
 .wheel-single { margin-bottom: 16px; }
+
+/* 修改题库弹层 */
+.seg { display: flex; gap: 6px; background: var(--bg-subtle); padding: 4px; border-radius: var(--r-sm); }
+.seg-btn { flex: 1; padding: 9px; border: none; background: transparent; border-radius: var(--r-xs); font-size: 13px; font-weight: 600; color: var(--text-2); cursor: pointer; font-family: inherit; white-space: nowrap; }
+.seg-btn.on { background: var(--surface); color: var(--brand-600); box-shadow: var(--sh-xs); }
+.cover-row { display: flex; gap: 14px; align-items: flex-start; }
+.cover-preview {
+  width: 96px; height: 128px; flex: none;
+  border-radius: var(--r-md);
+  border: 1.5px dashed var(--border-strong);
+  background: var(--bg-subtle);
+  overflow: hidden; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.cover-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover-placeholder { font-size: 12px; color: var(--text-3); text-align: center; line-height: 1.5; padding: 0 8px; }
+.cover-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 
 @media (min-width: 700px) {
   .wheel-stage { height: 340px; perspective-origin: 50% 170px; }

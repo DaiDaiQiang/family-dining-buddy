@@ -7,16 +7,21 @@
  * 两枚爱心弹出、底部三点跳动提示。
  *
  * props：
- *   size     — logo 宽度（px），默认 160；整屏启动可传 260+
- *   tip      — 底部提示文案，默认「正在加载」
- *   showTip  — 是否显示底部提示
- *   full     — 整屏模式（fixed 覆盖全屏，用于首屏接管 / 全屏加载）
- *   blobs    — 是否显示背景光斑
- *   backdrop — 是否绘制粉白渐变底（false 时透明，融入所在页面）
+ *   size      — logo 宽度（px），默认 160；整屏启动可传 260+
+ *   tip       — 底部提示文案，默认「正在加载」
+ *   showTip   — 是否显示底部提示
+ *   full      — 整屏模式（fixed 覆盖全屏，用于首屏接管 / 全屏加载）
+ *   blobs     — 是否显示背景光斑
+ *   backdrop  — 是否绘制粉白渐变底（false 时透明，融入所在页面）
+ *   customGif — 自定义加载动画 GIF 地址（/api/uploads/xxx.gif）
+ *               有值且非空时渲染该 GIF，取代「妍」字动画；
+ *               传 false 时强制禁用自定义 GIF（主页等场景不替换）。
+ *               省略（undefined）时交由全局 loader store 决定。
  *
  * 多实例安全：SVG defs 的 id 按组件实例唯一化，避免同页多个加载动画串色。
  */
-import { getCurrentInstance } from 'vue'
+import { computed, getCurrentInstance } from 'vue'
+import { useLoaderStore } from '@/stores/loader'
 
 const props = defineProps({
   size: { type: Number, default: 160 },
@@ -25,6 +30,16 @@ const props = defineProps({
   full: { type: Boolean, default: false },
   blobs: { type: Boolean, default: true },
   backdrop: { type: Boolean, default: true },
+  customGif: { type: [String, Boolean], default: undefined },
+})
+
+const loader = useLoaderStore()
+
+/** 最终生效的自定义 GIF 地址：prop 显式传 false 则禁用；传字符串则用该值；否则回落到全局设置 */
+const activeGif = computed(() => {
+  if (props.customGif === false) return ''
+  if (typeof props.customGif === 'string' && props.customGif) return props.customGif
+  return loader.customGif
 })
 
 const uid = getCurrentInstance().uid
@@ -45,7 +60,16 @@ const curl = (name) => `url(#${gid(name)})`
     </template>
 
     <div class="yan-loader">
+      <img
+        v-if="activeGif"
+        class="yan-gif"
+        :src="activeGif"
+        :style="{ width: size + 'px' }"
+        alt=""
+        aria-hidden="true"
+      />
       <svg
+        v-else
         class="yan-logo"
         :style="{ width: size + 'px' }"
         viewBox="0 0 240 240"
@@ -215,6 +239,14 @@ const curl = (name) => `url(#${gid(name)})`
   max-width: 80%;
   overflow: visible;
   animation: yan-life 2.8s ease-in-out infinite;
+}
+/* 自定义 GIF 加载动画 */
+.yan-gif {
+  height: auto;
+  max-width: 80%;
+  border-radius: var(--r-md, 12px);
+  object-fit: contain;
+  image-rendering: auto;
 }
 /* 整体：浮现 → 停留 → 上浮消散 */
 @keyframes yan-life {

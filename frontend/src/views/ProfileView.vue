@@ -10,12 +10,14 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { useLoaderStore } from '@/stores/loader'
 import { api } from '@/api'
 import { compressToJpeg } from '@/utils/image'
 import { toast } from '@/composables/useToast'
 
 const app = useAppStore()
 const auth = useAuthStore()
+const loader = useLoaderStore()
 const router = useRouter()
 
 const AVATARS = ['👨', '👩', '🧑', '👦', '👧', '👴', '👵', '👶', '🧒', '👨‍🍳', '🐱', '🐶', '🐰', '🐻']
@@ -33,6 +35,13 @@ const fileInput = ref(null)
 const pwdEditing = ref(false)
 const pwdSaving = ref(false)
 const pwdForm = reactive({ old: '', new: '', confirm: '' })
+
+// ---------- 自定义加载动画 ----------
+const loaderEditing = ref(false)
+const loaderSaving = ref(false)
+/** 本地预览（dataURL，未保存前） */
+const gifPreview = ref('')
+const gifInput = ref(null)
 
 const member = computed(() => app.currentMember)
 const roleLabel = computed(() => {
@@ -133,6 +142,64 @@ function logout() {
   auth.logout()
   router.push('/login')
 }
+
+// ---------- 自定义加载动画 ----------
+
+/** 打开自定义加载动画弹层 */
+function openLoader() {
+  gifPreview.value = loader.customGif || ''
+  loaderEditing.value = true
+}
+
+/** 选择 GIF 文件（不压缩，保动画） */
+function onPickGif(e) {
+  const file = e.target.files?.[0]
+  e.target.value = '' // 允许重选同一张
+  if (!file) return
+  if (file.type !== 'image/gif') { toast.warn('请选择 GIF 图片文件'); return }
+  if (file.size > 2 * 1024 * 1024) { toast.warn('GIF 不能超过 2MB'); return }
+  const reader = new FileReader()
+  reader.onload = () => { gifPreview.value = reader.result }
+  reader.onerror = () => toast.error('GIF 读取失败，请换一个')
+  reader.readAsDataURL(file)
+}
+
+/** 保存自定义加载动画 */
+async function saveLoader() {
+  if (!gifPreview.value) { toast.warn('请先选择一个 GIF 文件'); return }
+  loaderSaving.value = true
+  try {
+    let url = gifPreview.value
+    // 已是服务端地址（没换过图）则无需重传
+    if (!url.startsWith('/api/uploads/')) {
+      const res = await api.uploads.create(url)
+      url = res.url
+    }
+    await loader.save(url)
+    toast.success('加载动画已更新')
+    loaderEditing.value = false
+  } catch (e) {
+    toast.error(e.message || '保存失败，请重试')
+  } finally {
+    loaderSaving.value = false
+  }
+}
+
+/** 删除自定义加载动画，恢复默认「妍」字动画 */
+async function removeLoader() {
+  if (!loader.customGif) { toast.warn('当前未设置自定义动画'); return }
+  if (!confirm('确定恢复默认加载动画吗？')) return
+  loaderSaving.value = true
+  try {
+    await loader.clear()
+    gifPreview.value = ''
+    toast.success('已恢复默认动画')
+  } catch (e) {
+    toast.error(e.message || '操作失败，请重试')
+  } finally {
+    loaderSaving.value = false
+  }
+}
 </script>
 
 <template>
@@ -179,6 +246,15 @@ function logout() {
           <span class="menu-text">
             <span class="menu-title">系统版本</span>
             <span class="menu-sub">当前版本与历次更新内容</span>
+          </span>
+          <span class="menu-arrow">›</span>
+        </button>
+
+        <button class="menu-item" @click="openLoader">
+          <span class="menu-icon">🎞️</span>
+          <span class="menu-text">
+            <span class="menu-title">自定义加载动画</span>
+            <span class="menu-sub">上传 GIF 替换各页面的加载动画（主页除外）</span>
           </span>
           <span class="menu-arrow">›</span>
         </button>
@@ -266,6 +342,42 @@ function logout() {
           <div class="sheet-foot">
             <button class="btn btn--ghost grow" @click="pwdEditing = false">取消</button>
             <button class="btn btn--primary grow" :disabled="pwdSaving" @click="savePwd">{{ pwdSaving ? '保存中…' : '保存' }}</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- 自定义加载动画弹层 -->
+    <transition name="sheet">
+      <div v-if="loaderEditing" class="sheet-mask" @click.self="loaderEditing = false">
+        <div class="sheet">
+          <div class="sheet-head">
+            <h2>自定义加载动画</h2>
+            <button class="sheet-close" @click="loaderEditing = false">✕</button>
+          </div>
+          <div class="sheet-body">
+            <div class="preview">
+              <div class="gif-preview">
+                <img v-if="gifPreview" :src="gifPreview" alt="" class="gif-preview-img" />
+                <span v-else class="gif-preview-empty">还没有自定义动画</span>
+              </div>
+              <p class="preview-name">{{ gifPreview ? '预览效果' : '各页面加载时会显示这个动画' }}</p>
+            </div>
+
+            <input ref="gifInput" type="file" accept="image/gif" class="file-hide" @change="onPickGif" />
+            <button class="upload-btn" @click="gifInput?.click()">
+              <span class="upload-btn-icon">🎞️</span>
+              上传 GIF 动画
+            </button>
+            <p class="upload-hint">仅支持 GIF（2MB 内）；主页加载动画不会替换</p>
+
+            <button v-if="loader.customGif" class="btn btn--ghost btn--sm loader-remove" :disabled="loaderSaving" @click="removeLoader">
+              恢复默认「妍」字动画
+            </button>
+          </div>
+          <div class="sheet-foot">
+            <button class="btn btn--ghost grow" @click="loaderEditing = false">取消</button>
+            <button class="btn btn--primary grow" :disabled="loaderSaving" @click="saveLoader">{{ loaderSaving ? '保存中…' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -440,6 +552,33 @@ function logout() {
   display: block;
 }
 .preview-name { font-size: 16px; font-weight: 700; }
+
+.gif-preview {
+  width: 160px;
+  height: 160px;
+  border-radius: var(--r-md);
+  background: var(--bg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.gif-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.gif-preview-empty {
+  font-size: 13px;
+  color: var(--text-4);
+  padding: 0 16px;
+  text-align: center;
+}
+.loader-remove {
+  width: 100%;
+  margin-top: 14px;
+}
 
 .file-hide { display: none; }
 .upload-btn {

@@ -64,6 +64,8 @@ pub fn configure(cfg: &mut web::ServiceConfig, upload_dir: PathBuf) {
                 web::put().to(health::save_profile),
             )
             // ---- 成员同步数据（JSON blob）----
+            .route("/sync/shared/{key}", web::get().to(sync::get_shared_sync))
+            .route("/sync/shared/{key}", web::put().to(sync::put_shared_sync))
             .route("/sync/{key}", web::get().to(sync::get_sync))
             .route("/sync/{key}", web::put().to(sync::put_sync))
             // ---- 站内提醒（阶段 2，静态段放在 {id} 之前）----

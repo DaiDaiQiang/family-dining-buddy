@@ -108,6 +108,15 @@ export const api = {
         data: expectedVersion === undefined
           ? { payload }
           : { payload, expected_version: expectedVersion }
+      }),
+    // 家庭共享数据（公有题库等）
+    getShared: (key) => call(`/sync/shared/${key}`),
+    putShared: (key, payload, expectedVersion) =>
+      call(`/sync/shared/${key}`, {
+        method: 'put',
+        data: expectedVersion === undefined
+          ? { payload }
+          : { payload, expected_version: expectedVersion }
       })
   },
 

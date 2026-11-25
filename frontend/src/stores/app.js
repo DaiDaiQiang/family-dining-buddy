@@ -6,6 +6,7 @@ import { useParcelStore } from './parcel'
 import { useHealthStore } from './health'
 import { useStudyStore } from './study'
 import { useReminderStore } from './reminder'
+import { useLoaderStore } from './loader'
 
 /**
  * 应用级全局状态：连接模式、成员、元数据字典
@@ -58,7 +59,9 @@ export const useAppStore = defineStore('app', {
           useParcelStore().load(),
           useHealthStore().load(),
           useStudyStore().pull(),
-          useReminderStore().load()
+          useStudyStore().pullShared(),
+          useReminderStore().load(),
+          useLoaderStore().load()
         ])
       }
       // 没有记录过当前成员时，默认选第一位

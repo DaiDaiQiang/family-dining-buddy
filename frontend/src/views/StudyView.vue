@@ -75,9 +75,10 @@ const importText = ref('')
 const importResult = ref(null)
 const fileInput = ref(null)
 
-/** 题库元数据：展示图片 + 说明 */
+/** 题库元数据：展示图片 + 说明 + 可见范围 */
 const importCover = ref('')      // 图片地址（/api/uploads/xxx 或 dataURL 预览）
 const importDesc = ref('')
+const importScope = ref('private')   // 'private' 私有 | 'public' 家庭共享
 const coverUploading = ref(false)
 const coverInput = ref(null)
 
@@ -87,6 +88,7 @@ function openImport() {
   importResult.value = null
   importCover.value = ''
   importDesc.value = ''
+  importScope.value = 'private'
   importing.value = true
 }
 
@@ -146,12 +148,14 @@ function doImport() {
   const res = study.importJSON(text, {
     bank,
     bankAction: 'merge',
+    scope: importScope.value,
     bankMeta: { cover: importCover.value, desc: importDesc.value.trim() }
   })
   importResult.value = res
   if (res.ok) {
     const s = res.summary
-    toast.success(`已导入「${s.bank}」：新增 ${s.added}${s.updated ? `，覆盖 ${s.updated} 题` : ''}`)
+    const scopeNote = s.scope === 'public' ? '（家庭共享）' : ''
+    toast.success(`已导入「${s.bank}」${scopeNote}：新增 ${s.added}${s.updated ? `，覆盖 ${s.updated} 题` : ''}`)
   } else {
     toast.error(res.error || '导入失败')
   }
@@ -313,6 +317,30 @@ function clearAll() {
               />
               <p class="field-hint">
                 本次导入的题目都会归到这个题库。题库名称唯一，已存在的名称会被拒绝，请换一个。
+              </p>
+            </div>
+
+            <!-- 公有 / 私有选择 -->
+            <div class="field">
+              <label class="field-label">题库范围</label>
+              <div class="seg">
+                <button
+                  type="button"
+                  class="seg-btn"
+                  :class="{ on: importScope === 'private' }"
+                  @click="importScope = 'private'"
+                >🔒 私有（仅自己）</button>
+                <button
+                  type="button"
+                  class="seg-btn"
+                  :class="{ on: importScope === 'public' }"
+                  @click="importScope = 'public'"
+                >👨‍👩‍👧 家庭共享</button>
+              </div>
+              <p class="field-hint">
+                {{ importScope === 'public'
+                  ? '家庭共享：所有家庭成员都能看到并刷这套题，只有创建者能修改或删除。'
+                  : '私有：只有你自己能看到和使用这套题。' }}
               </p>
             </div>
 

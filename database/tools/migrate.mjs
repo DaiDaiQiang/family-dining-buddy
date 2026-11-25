@@ -14,7 +14,8 @@ const MIGRATIONS = [
   { label: '阶段 2 · 家庭档案扩展', file: '04_phase2_profile_reminder.sql' },
   { label: '阶段 5 · 成员头像图片', file: '05_member_avatar_url.sql' },
   { label: '系统版本 · 更新记录', file: '06_system_version.sql' },
-  { label: '阶段 3 · 耗材维护与消耗统计', file: '07_consumable.sql' }
+  { label: '阶段 3 · 耗材维护与消耗统计', file: '07_consumable.sql' },
+  { label: '学习模块 · 家庭共享数据（公有题库）', file: '08_shared_data.sql' }
 ]
 
 async function main() {
